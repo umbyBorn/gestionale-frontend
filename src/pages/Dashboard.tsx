@@ -20,6 +20,7 @@ const Dashboard: React.FC = () => {
     { titolo: 'Staff', descrizione: 'Gestisci collaboratori e contratti', href: '/staff', colore: 'bg-purple-50 border-purple-200' },
     { titolo: 'Presenze', descrizione: 'Registra le presenze agli allenamenti', href: '/presenze', colore: 'bg-orange-50 border-orange-200' },
     { titolo: 'Assemblee', descrizione: 'Gestisci assemblee e verbali', href: '/assemblee', colore: 'bg-red-50 border-red-200' },
+    { titolo: 'Calendario', descrizione: 'Gestisci eventi e allenamenti', href: '/calendario', colore: 'bg-teal-50 border-teal-200' },
   ];
 
   return (
