@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getEventi, creaEvento, getGruppi, getTesserati, getPresenzeEvento, registraPresenza } from '../services/api';
+import axios from 'axios';
 
 interface Evento {
   id: number;
@@ -11,22 +12,9 @@ interface Evento {
   luogo?: string;
 }
 
-interface Gruppo {
-  id: number;
-  nome: string;
-}
-
-interface Tesserato {
-  id: number;
-  nome: string;
-  cognome: string;
-}
-
-interface Presenza {
-  id: number;
-  tesserato_id: number;
-  presente: boolean;
-}
+interface Gruppo { id: number; nome: string; }
+interface Tesserato { id: number; nome: string; cognome: string; }
+interface Presenza { id: number; tesserato_id: number; presente: boolean; }
 
 const Presenze: React.FC = () => {
   const [eventi, setEventi] = useState<Evento[]>([]);
@@ -66,11 +54,17 @@ const Presenze: React.FC = () => {
 
   const handlePresenza = async (tesserato_id: number, presente: boolean) => {
     const esistente = presenze.find(p => p.tesserato_id === tesserato_id);
-    if (!esistente) {
+    if (esistente) {
+      await axios.put(`https://gestionale-sport-api.onrender.com/presenze/${esistente.id}`, {
+        evento_id: eventoSelezionato!.id,
+        tesserato_id,
+        presente
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+    } else {
       await registraPresenza({ evento_id: eventoSelezionato!.id, tesserato_id, presente });
-      const res = await getPresenzeEvento(eventoSelezionato!.id);
-      setPresenze(res.data);
     }
+    const res = await getPresenzeEvento(eventoSelezionato!.id);
+    setPresenze(res.data);
   };
 
   const nomeGruppo = (id: number) => gruppi.find(g => g.id === id)?.nome || `Gruppo ${id}`;
@@ -86,7 +80,7 @@ const Presenze: React.FC = () => {
           + Nuovo evento
         </button>
       </header>
-      <main className="p-6">
+      <main className="p-4">
         {loading ? <p className="text-gray-500">Caricamento...</p> : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -99,7 +93,7 @@ const Presenze: React.FC = () => {
                       <div>
                         <h3 className="font-medium text-gray-800">{e.titolo}</h3>
                         <p className="text-sm text-gray-500">{e.data} {e.ora_inizio ? `• ${e.ora_inizio}` : ''}</p>
-                        <p className="text-xs text-gray-400">{nomeGruppo(e.gruppo_id)} • {e.luogo || 'Luogo non specificato'}</p>
+                        <p className="text-xs text-gray-400">{nomeGruppo(e.gruppo_id)} {e.luogo ? `• ${e.luogo}` : ''}</p>
                       </div>
                       <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded h-fit">{e.tipo}</span>
                     </div>
@@ -117,7 +111,7 @@ const Presenze: React.FC = () => {
                     <thead className="bg-blue-800 text-white">
                       <tr>
                         <th className="px-4 py-3 text-left">Tesserato</th>
-                        <th className="px-4 py-3 text-left">Presenza</th>
+                        <th className="px-4 py-3 text-center">Presenza</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -127,16 +121,20 @@ const Presenze: React.FC = () => {
                           <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                             <td className="px-4 py-3">{t.nome} {t.cognome}</td>
                             <td className="px-4 py-3">
-                              {presenza ? (
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${presenza.presente ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                                  {presenza.presente ? 'Presente' : 'Assente'}
-                                </span>
-                              ) : (
-                                <div className="flex gap-2">
-                                  <button onClick={() => handlePresenza(t.id, true)} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200">Presente</button>
-                                  <button onClick={() => handlePresenza(t.id, false)} className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200">Assente</button>
-                                </div>
-                              )}
+                              <div className="flex gap-2 justify-center">
+                                <button
+                                  onClick={() => handlePresenza(t.id, true)}
+                                  className={`px-3 py-1 rounded text-xs font-medium ${presenza?.presente === true ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'}`}
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => handlePresenza(t.id, false)}
+                                  className={`px-3 py-1 rounded text-xs font-medium ${presenza?.presente === false ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'}`}
+                                >
+                                  ✗
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -150,7 +148,7 @@ const Presenze: React.FC = () => {
         )}
 
         {mostraForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
               <h2 className="text-lg font-bold text-gray-800 mb-4">Nuovo Evento</h2>
               <div className="space-y-4">
@@ -184,7 +182,7 @@ const Presenze: React.FC = () => {
                       className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora inizio</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora</label>
                     <input type="time" value={form.ora_inizio} onChange={(e) => setForm({ ...form, ora_inizio: e.target.value })}
                       className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
