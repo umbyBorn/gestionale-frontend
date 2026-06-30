@@ -80,3 +80,6 @@ export const inviaMessaggio = (dati: any) =>
 
 export const getMessaggiInviati = () =>
   api.get('/messaggi/');
+export const getGruppiTesserato = (id: number) => api.get(`/tesserati/${id}/gruppi`);
+export const aggiornaGruppiTesserato = (id: number, gruppiId: number[]) =>
+  api.put(`/tesserati/${id}/gruppi`, gruppiId);
