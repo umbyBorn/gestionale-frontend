@@ -71,3 +71,12 @@ export const registraPresenza = (data: any) => api.post('/presenze/', data);
 // ---- ASSEMBLEE ----
 export const getAssemblee = () => api.get('/assemblee/');
 export const creaAssemblea = (data: any) => api.post('/assemblee/', data);
+
+export const getTesseratiGruppo = (gruppoId: number) =>
+  api.get(`/messaggi/gruppi/${gruppoId}/tesserati`);
+
+export const inviaMessaggio = (dati: any) =>
+  api.post('/messaggi/invia', dati);
+
+export const getMessaggiInviati = () =>
+  api.get('/messaggi/');

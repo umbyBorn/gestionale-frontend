@@ -21,6 +21,7 @@ const Dashboard: React.FC = () => {
     { titolo: 'Presenze', descrizione: 'Registra le presenze agli allenamenti', href: '/presenze', colore: 'bg-orange-50 border-orange-200' },
     { titolo: 'Assemblee', descrizione: 'Gestisci assemblee e verbali', href: '/assemblee', colore: 'bg-red-50 border-red-200' },
     { titolo: 'Calendario', descrizione: 'Gestisci eventi e allenamenti', href: '/calendario', colore: 'bg-teal-50 border-teal-200' },
+    { titolo: 'Messaggi', descrizione: 'Invia comunicazioni broadcast ai tesserati', href: '/messaggi', colore: 'bg-pink-50 border-pink-200' },
   ];
 
   return (

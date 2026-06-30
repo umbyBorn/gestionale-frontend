@@ -10,6 +10,7 @@ import Staff from './pages/Staff';
 import Presenze from './pages/Presenze';
 import Assemblee from './pages/Assemblee';
 import Calendario from './pages/Calendario';
+import Messaggi from './pages/Messaggi';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { utente, loading } = useAuth();
@@ -32,6 +33,7 @@ const App: React.FC = () => {
           <Route path="/presenze" element={<ProtectedRoute><Presenze /></ProtectedRoute>} />
           <Route path="/assemblee" element={<ProtectedRoute><Assemblee /></ProtectedRoute>} />
           <Route path="/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
+          <Route path="/messaggi" element={<ProtectedRoute><Messaggi /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
