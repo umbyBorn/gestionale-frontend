@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato } from '../services/api';
+import { getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, getGruppi, getGruppiTesserato, aggiornaGruppiTesserato } from '../services/api';
 
 interface Tesserato {
   id: number;
@@ -13,6 +13,11 @@ interface Tesserato {
   attivo: boolean;
 }
 
+interface Gruppo {
+  id: number;
+  nome: string;
+}
+
 const formVuoto = {
   nome: '', cognome: '', data_nascita: '', codice_fiscale: '',
   telefono: '', indirizzo: '', e_socio: true
@@ -20,11 +25,13 @@ const formVuoto = {
 
 const Tesserati: React.FC = () => {
   const [tesserati, setTesserati] = useState<Tesserato[]>([]);
+  const [gruppi, setGruppi] = useState<Gruppo[]>([]);
   const [loading, setLoading] = useState(true);
   const [mostraForm, setMostraForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [ricerca, setRicerca] = useState('');
   const [form, setForm] = useState(formVuoto);
+  const [gruppiSelezionati, setGruppiSelezionati] = useState<number[]>([]);
 
   const caricaTesserati = () => {
     getTesserati().then((res) => {
@@ -33,15 +40,19 @@ const Tesserati: React.FC = () => {
     });
   };
 
-  useEffect(() => { caricaTesserati(); }, []);
+  useEffect(() => {
+    caricaTesserati();
+    getGruppi().then((res) => setGruppi(res.data));
+  }, []);
 
   const apriNuovo = () => {
     setEditingId(null);
     setForm(formVuoto);
+    setGruppiSelezionati([]);
     setMostraForm(true);
   };
 
-  const apriModifica = (t: Tesserato) => {
+  const apriModifica = async (t: Tesserato) => {
     setEditingId(t.id);
     setForm({
       nome: t.nome,
@@ -52,18 +63,32 @@ const Tesserati: React.FC = () => {
       indirizzo: t.indirizzo || '',
       e_socio: t.e_socio,
     });
+    const res = await getGruppiTesserato(t.id);
+    setGruppiSelezionati(res.data);
     setMostraForm(true);
   };
 
+  const toggleGruppo = (id: number) => {
+    setGruppiSelezionati((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
+    );
+  };
+
   const handleSubmit = async () => {
+    let id = editingId;
     if (editingId) {
       await aggiornaTesserato(editingId, form);
     } else {
-      await creaTesserato(form);
+      const res = await creaTesserato(form);
+      id = res.data.id;
+    }
+    if (id) {
+      await aggiornaGruppiTesserato(id, gruppiSelezionati);
     }
     setMostraForm(false);
     setEditingId(null);
     setForm(formVuoto);
+    setGruppiSelezionati([]);
     caricaTesserati();
   };
 
@@ -145,8 +170,8 @@ const Tesserati: React.FC = () => {
         )}
 
         {mostraForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
               <h2 className="text-lg font-bold text-gray-800 mb-4">{editingId ? 'Modifica Tesserato' : 'Nuovo Tesserato'}</h2>
               <div className="grid grid-cols-2 gap-4">
                 {[
@@ -170,6 +195,27 @@ const Tesserati: React.FC = () => {
                 <div className="col-span-2 flex items-center gap-2">
                   <input type="checkbox" checked={form.e_socio} onChange={(e) => setForm({ ...form, e_socio: e.target.checked })} id="socio" />
                   <label htmlFor="socio" className="text-sm text-gray-700">È socio dell'associazione</label>
+                </div>
+
+                <div className="col-span-2 border-t pt-3 mt-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Gruppi / Corsi</label>
+                  <div className="flex flex-wrap gap-2">
+                    {gruppi.map((g) => (
+                      <button
+                        type="button"
+                        key={g.id}
+                        onClick={() => toggleGruppo(g.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm border ${
+                          gruppiSelezionati.includes(g.id)
+                            ? 'bg-blue-700 text-white border-blue-700'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {g.nome}
+                      </button>
+                    ))}
+                    {gruppi.length === 0 && <p className="text-xs text-gray-400">Nessun gruppo creato ancora</p>}
+                  </div>
                 </div>
               </div>
               <div className="flex gap-3 mt-6 justify-end">
