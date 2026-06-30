@@ -75,6 +75,12 @@ const Tesserati: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (!form.codice_fiscale.trim()) {
+      const conferma = window.confirm(
+        'Il Codice Fiscale non è stato inserito.\n\nSi consiglia vivamente di inserirlo per identificare univocamente il tesserato.\n\nVuoi continuare comunque?'
+      );
+      if (!conferma) return;
+    }
     let id = editingId;
     if (editingId) {
       await aggiornaTesserato(editingId, form);
