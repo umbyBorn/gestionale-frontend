@@ -83,3 +83,28 @@ export const getMessaggiInviati = () =>
 export const getGruppiTesserato = (id: number) => api.get(`/tesserati/${id}/gruppi`);
 export const aggiornaGruppiTesserato = (id: number, gruppiId: number[]) =>
   api.put(`/tesserati/${id}/gruppi`, gruppiId);
+
+// ---- GENITORI ----
+export const getGenitori = () => api.get('/tesserati/genitori/');
+export const creaGenitore = (data: any) => api.post('/tesserati/genitori/', data);
+export const aggiornaGenitore = (id: number, data: any) => api.put(`/tesserati/genitori/${id}`, data);
+
+// ---- FOTO E DOCUMENTI ----
+export const caricaFoto = (tesseratoId: number, file: File) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return api.post(`/tesserati/${tesseratoId}/foto`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+
+export const getDocumenti = (tesseratoId: number) => api.get(`/tesserati/${tesseratoId}/documenti`);
+
+export const caricaDocumento = (tesseratoId: number, tipo: string, file: File, dataScadenza?: string, note?: string) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('tipo', tipo);
+  if (dataScadenza) fd.append('data_scadenza', dataScadenza);
+  if (note) fd.append('note', note);
+  return api.post(`/tesserati/${tesseratoId}/documenti`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+
+export const eliminaDocumento = (documentoId: number) => api.delete(`/tesserati/documenti/${documentoId}`);
