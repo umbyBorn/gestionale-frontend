@@ -485,12 +485,20 @@ Sei sicuro?`)) {
               <div className="px-6 py-4 border-t flex justify-between items-center">
                 <div className="flex gap-2">
                   {sezioneAttiva > 0 && <button onClick={() => setSezioneAttiva(s => s - 1)} className="text-sm text-gray-600 hover:text-gray-800">← Indietro</button>}
+                  {editingId && (
+                    <button onClick={() => handleEliminaDefinitivo(editingId, form.nome, form.cognome)}
+                      className="px-3 py-2 bg-red-700 text-white rounded text-xs hover:bg-red-900 ml-2">
+                      🗑 Elimina definitivamente
+                    </button>
+                  )}
                 </div>
                 <div className="flex gap-3">
-                  {sezioneAttiva < SEZIONI.length - 1
-                    ? <button onClick={() => setSezioneAttiva(s => s + 1)} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Avanti →</button>
-                    : <button onClick={handleSubmit} disabled={salvando} className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50">{salvando ? 'Salvataggio...' : 'Salva'}</button>
-                  }
+                  {sezioneAttiva < SEZIONI.length - 1 && (
+                    <button onClick={() => setSezioneAttiva(s => s + 1)} className="px-4 py-2 text-blue-700 border border-blue-700 rounded text-sm hover:bg-blue-50">Avanti →</button>
+                  )}
+                  <button onClick={handleSubmit} disabled={salvando} className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50">
+                    {salvando ? 'Salvataggio...' : '✓ Salva'}
+                  </button>
                 </div>
               </div>
             </div>
