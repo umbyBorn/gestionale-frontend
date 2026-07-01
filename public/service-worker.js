@@ -1,13 +1,10 @@
-// Service Worker minimo per Gestionale Sportivo PWA
 const CACHE_NAME = 'gestionale-v1';
 
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-});
+self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
+    caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     )
   );
@@ -15,6 +12,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Lascia passare tutte le richieste normalmente
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  // Non intercettare chiamate API esterne
+  if (event.request.url.includes('onrender.com') || event.request.url.includes('cloudinary.com')) {
+    return;
+  }
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
+  );
 });

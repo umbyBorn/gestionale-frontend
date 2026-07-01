@@ -17,7 +17,8 @@ interface MessaggioInviato {
   intestazione: string;
   corpo: string;
   data_invio: string;
-  destinatari: { tesserato_id: number; nome: string; cognome: string; email_inviata: boolean }[];
+  num_destinatari: number;
+  num_email_inviate: number;
 }
 
 const Messaggi: React.FC = () => {
@@ -204,10 +205,10 @@ const Messaggi: React.FC = () => {
               className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
             >
               <option value="">Aggiungi tesserato non presente nei gruppi selezionati...</option>
-              {tuttiTesserati
-                .filter((t) => !destinatari.some((d) => d.id === t.id) && !aggiuntivi.some((a) => a.id === t.id))
+              {[...tuttiTesserati]
+                .sort((a, b) => a.cognome.localeCompare(b.cognome))
                 .map((t) => (
-                  <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>
+                  <option key={t.id} value={t.id}>{t.cognome} {t.nome}</option>
                 ))}
             </select>
             <button onClick={aggiungiTesseratoExtra} className="bg-gray-700 text-white px-3 py-2 rounded text-sm hover:bg-gray-800">
@@ -261,7 +262,7 @@ const Messaggi: React.FC = () => {
                     </div>
                     <p className="text-sm text-gray-600 mb-2">{m.corpo}</p>
                     <p className="text-xs text-gray-400">
-                      {m.destinatari.length} destinatari · {m.destinatari.filter((d) => d.email_inviata).length} email inviate
+                      {m.num_destinatari} destinatari · {m.num_email_inviate} email inviate
                     </p>
                   </div>
                 ))}
