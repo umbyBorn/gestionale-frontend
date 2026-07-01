@@ -44,7 +44,8 @@ const Tesserati: React.FC = () => {
   const [mostraForm, setMostraForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [ricerca, setRicerca] = useState('');
-  const [filtroGruppo, setFiltroGruppo] = useState('');
+  const gruppoFromUrl = new URLSearchParams(window.location.search).get('gruppo') || '';
+  const [filtroGruppo, setFiltroGruppo] = useState(gruppoFromUrl);
   const [filtroSport, setFiltroSport] = useState('');
   const [filtroAnnoNascita, setFiltroAnnoNascita] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
@@ -125,6 +126,9 @@ const Tesserati: React.FC = () => {
       if (id) await aggiornaGruppiTesserato(id, gruppiSelezionati);
       setMostraForm(false); setEditingId(null); setForm(formVuoto);
       setGruppiSelezionati([]); caricaTutti();
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Errore sconosciuto';
+      alert('Errore nel salvataggio: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
     } finally { setSalvando(false); }
   };
 
@@ -334,8 +338,6 @@ Sei sicuro?`)) {
                     <td className="px-4 py-2 flex gap-2">
                       <button onClick={() => apriDettaglio(t)} className="text-green-600 hover:text-green-800 text-xs">Scheda</button>
                       <button onClick={() => apriModifica(t)} className="text-blue-600 hover:text-blue-800 text-xs">Modifica</button>
-                      <button onClick={() => handleElimina(t.id)} className="text-orange-500 hover:text-orange-700 text-xs">Disattiva</button>
-                      <button onClick={() => handleEliminaDefinitivo(t.id, t.nome, t.cognome)} className="text-red-700 hover:text-red-900 text-xs font-bold">Elimina</button>
                     </td>
                   </tr>
                 ))}

@@ -115,7 +115,7 @@ const Gruppi: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-3 text-xs text-blue-600 font-medium">
-                  Clicca per vedere i tesserati →
+                  Clicca per vedere i tesserati del gruppo →
                 </div>
               </div>
             ))}
@@ -196,7 +196,7 @@ const Gruppi: React.FC = () => {
                           <td className="px-4 py-2">{t.categoria || '-'}</td>
                           <td className="px-4 py-2 text-xs">{t.cellulare || t.telefono || t.email || '-'}</td>
                           <td className="px-4 py-2">
-                            <a href="/tesserati" className="text-blue-600 hover:text-blue-800 text-xs">
+                            <a href={`/tesserati?gruppo=${encodeURIComponent(gruppoSelezionato.nome)}`} className="text-blue-600 hover:text-blue-800 text-xs">
                               Vai alla scheda →
                             </a>
                           </td>
