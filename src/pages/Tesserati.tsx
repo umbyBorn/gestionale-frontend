@@ -44,6 +44,12 @@ const Tesserati: React.FC = () => {
   const [mostraForm, setMostraForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [ricerca, setRicerca] = useState('');
+  const [filtroGruppo, setFiltroGruppo] = useState('');
+  const [filtroSport, setFiltroSport] = useState('');
+  const [filtroAnnoNascita, setFiltroAnnoNascita] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroCFTemp, setFiltroCFTemp] = useState(false);
+  const [filtroTesseraScaduta, setFiltroTesseraScaduta] = useState(false);
   const [form, setForm] = useState(formVuoto);
   const [gruppiSelezionati, setGruppiSelezionati] = useState<number[]>([]);
   const [sezioneAttiva, setSezioneAttiva] = useState(0);
@@ -174,9 +180,21 @@ const Tesserati: React.FC = () => {
     </div>
   );
 
-  const filtrati = tesserati.filter(t =>
-    `${t.nome} ${t.cognome} ${t.codice_fiscale}`.toLowerCase().includes(ricerca.toLowerCase())
-  );
+  const oggi = new Date().toISOString().split('T')[0];
+  const filtrati = tesserati.filter(t => {
+    if (ricerca && !`${t.nome} ${t.cognome} ${t.codice_fiscale}`.toLowerCase().includes(ricerca.toLowerCase())) return false;
+    if (filtroGruppo && !(t as any).gruppi_nomi?.includes(filtroGruppo)) return false;
+    if (filtroSport && t.sport !== filtroSport) return false;
+    if (filtroCategoria && t.categoria !== filtroCategoria) return false;
+    if (filtroAnnoNascita && !t.data_nascita?.startsWith(filtroAnnoNascita)) return false;
+    if (filtroCFTemp && !t.codice_fiscale?.startsWith('TEMP_')) return false;
+    if (filtroTesseraScaduta && (!t.data_scadenza_tessera || t.data_scadenza_tessera >= oggi)) return false;
+    return true;
+  });
+
+  const sportiDisponibili = [...new Set(tesserati.map(t => t.sport).filter(Boolean))];
+  const categorieDisponibili = [...new Set(tesserati.map(t => t.categoria).filter(Boolean))];
+  const anniDisponibili = [...new Set(tesserati.map(t => t.data_nascita?.substring(0,4)).filter(Boolean))].sort();
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -194,6 +212,62 @@ const Tesserati: React.FC = () => {
         <input type="text" placeholder="Cerca per nome, cognome o CF..."
           value={ricerca} onChange={e => setRicerca(e.target.value)}
           className="w-full max-w-md border border-gray-300 rounded px-3 py-2 mb-6 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+        {/* FILTRI */}
+        <div className="bg-white rounded-lg shadow p-4 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Gruppo</label>
+            <select value={filtroGruppo} onChange={e => setFiltroGruppo(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">Tutti i gruppi</option>
+              {gruppi.map(g => <option key={g.id} value={g.nome}>{g.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Sport</label>
+            <select value={filtroSport} onChange={e => setFiltroSport(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">Tutti gli sport</option>
+              {sportiDisponibili.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Categoria</label>
+            <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">Tutte le categorie</option>
+              {categorieDisponibili.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Anno di nascita</label>
+            <select value={filtroAnnoNascita} onChange={e => setFiltroAnnoNascita(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="">Tutti gli anni</option>
+              {anniDisponibili.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 col-span-2 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={filtroCFTemp} onChange={e => setFiltroCFTemp(e.target.checked)} />
+              Solo CF temporanei da completare
+            </label>
+          </div>
+          <div className="flex items-center gap-2 col-span-2 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={filtroTesseraScaduta} onChange={e => setFiltroTesseraScaduta(e.target.checked)} />
+              Solo tessere scadute
+            </label>
+          </div>
+          {(filtroGruppo || filtroSport || filtroCategoria || filtroAnnoNascita || filtroCFTemp || filtroTesseraScaduta) && (
+            <div className="col-span-2 md:col-span-4 flex justify-end">
+              <button onClick={() => { setFiltroGruppo(''); setFiltroSport(''); setFiltroCategoria(''); setFiltroAnnoNascita(''); setFiltroCFTemp(false); setFiltroTesseraScaduta(false); }}
+                className="text-xs text-blue-600 hover:text-blue-800">
+                ✕ Rimuovi tutti i filtri ({filtrati.length} risultati)
+              </button>
+            </div>
+          )}
+        </div>
 
         {loading ? <p className="text-gray-500">Caricamento...</p> : (
           <div className="bg-white rounded-lg shadow overflow-x-auto">
