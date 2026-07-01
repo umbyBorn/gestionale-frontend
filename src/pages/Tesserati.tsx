@@ -192,9 +192,9 @@ const Tesserati: React.FC = () => {
     return true;
   });
 
-  const sportiDisponibili = [...new Set(tesserati.map(t => t.sport).filter(Boolean))];
-  const categorieDisponibili = [...new Set(tesserati.map(t => t.categoria).filter(Boolean))];
-  const anniDisponibili = [...new Set(tesserati.map(t => t.data_nascita?.substring(0,4)).filter(Boolean))].sort();
+  const sportiDisponibili = Array.from(new Set(tesserati.map(t => t.sport).filter((s): s is string => !!s)));
+  const categorieDisponibili = Array.from(new Set(tesserati.map(t => t.categoria).filter((c): c is string => !!c)));
+  const anniDisponibili = Array.from(new Set(tesserati.map(t => t.data_nascita?.substring(0,4)).filter((a): a is string => !!a))).sort();
 
   return (
     <div className="min-h-screen bg-gray-100">
