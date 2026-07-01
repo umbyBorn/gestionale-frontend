@@ -103,12 +103,16 @@ const Tesserati: React.FC = () => {
       if (!ok) return;
     }
     setSalvando(true);
+    // Pulizia: converti stringhe vuote in null per i campi opzionali
+    const formPulito = Object.fromEntries(
+      Object.entries(form).map(([k, v]) => [k, v === '' ? null : v])
+    );
     try {
       let id = editingId;
       if (editingId) {
-        await aggiornaTesserato(editingId, form);
+        await aggiornaTesserato(editingId, formPulito);
       } else {
-        const res = await creaTesserato(form);
+        const res = await creaTesserato(formPulito);
         id = res.data.id;
       }
       if (id) await aggiornaGruppiTesserato(id, gruppiSelezionati);
