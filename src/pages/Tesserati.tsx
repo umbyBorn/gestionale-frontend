@@ -554,11 +554,10 @@ Sei sicuro?`)) {
                             {d.data_scadenza && <span className="text-orange-500 ml-2 text-xs">scad. {d.data_scadenza}</span>}
                           </div>
                           <div className="flex gap-3">
-                            {d.nome_file.toLowerCase().endsWith('.pdf')
-                              ? <a href={`https://docs.google.com/viewer?url=${encodeURIComponent(d.url)}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">Apri PDF</a>
-                              : <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">Apri</a>
-                            }
-                            <a href={d.url} download={d.nome_file} className="text-green-600 hover:text-green-800 text-xs">Scarica</a>
+                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">
+                              {d.nome_file.toLowerCase().endsWith('.pdf') ? '📄 Apri PDF' : '🖼 Apri'}
+                            </a>
+                            <a href={d.url.replace('/upload/', '/upload/fl_attachment/')} className="text-green-600 hover:text-green-800 text-xs">⬇ Scarica</a>
                             <button onClick={() => handleEliminaDoc(d.id)} className="text-red-500 hover:text-red-700 text-xs">Elimina</button>
                           </div>
                         </div>
