@@ -108,3 +108,5 @@ export const caricaDocumento = (tesseratoId: number, tipo: string, file: File, d
 };
 
 export const eliminaDocumento = (documentoId: number) => api.delete(`/tesserati/documenti/${documentoId}`);
+
+export const eliminaTesseratoDefinitivo = (id: number) => api.delete(`/tesserati/${id}/definitivo`);

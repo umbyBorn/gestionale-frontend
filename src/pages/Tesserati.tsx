@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato,
+  getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, eliminaTesseratoDefinitivo,
   getGruppi, getGruppiTesserato, aggiornaGruppiTesserato,
   getGenitori, creaGenitore, aggiornaGenitore,
   caricaFoto, getDocumenti, caricaDocumento, eliminaDocumento
@@ -50,6 +50,7 @@ const Tesserati: React.FC = () => {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroCFTemp, setFiltroCFTemp] = useState(false);
   const [filtroTesseraScaduta, setFiltroTesseraScaduta] = useState(false);
+  const [ordinamento, setOrdinamento] = useState<{campo: string, direzione: 'asc'|'desc'}>({campo: 'cognome', direzione: 'asc'});
   const [form, setForm] = useState(formVuoto);
   const [gruppiSelezionati, setGruppiSelezionati] = useState<number[]>([]);
   const [sezioneAttiva, setSezioneAttiva] = useState(0);
@@ -127,6 +128,19 @@ const Tesserati: React.FC = () => {
     } finally { setSalvando(false); }
   };
 
+  const handleEliminaDefinitivo = async (id: number, nome: string, cognome: string) => {
+    if (window.confirm(`ATTENZIONE: stai per eliminare DEFINITIVAMENTE ${nome} ${cognome}.
+
+Questa operazione è irreversibile e cancellerà anche tutti i documenti associati.
+
+Sei sicuro?`)) {
+      if (window.confirm(`Ultima conferma: eliminare definitivamente ${nome} ${cognome}?`)) {
+        await eliminaTesseratoDefinitivo(id);
+        caricaTutti();
+      }
+    }
+  };
+
   const handleElimina = async (id: number) => {
     if (window.confirm('Vuoi disattivare questo tesserato?')) {
       await eliminaTesserato(id); caricaTutti();
@@ -191,6 +205,24 @@ const Tesserati: React.FC = () => {
     if (filtroTesseraScaduta && (!t.data_scadenza_tessera || t.data_scadenza_tessera >= oggi)) return false;
     return true;
   });
+
+  const ordinati = [...filtrati].sort((a, b) => {
+    const campo = ordinamento.campo as keyof Tesserato;
+    const va = (a[campo] || '') as string;
+    const vb = (b[campo] || '') as string;
+    return ordinamento.direzione === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+
+  const toggleOrdinamento = (campo: string) => {
+    setOrdinamento(prev => prev.campo === campo
+      ? { campo, direzione: prev.direzione === 'asc' ? 'desc' : 'asc' }
+      : { campo, direzione: 'asc' }
+    );
+  };
+
+  const icona = (campo: string) => ordinamento.campo === campo
+    ? (ordinamento.direzione === 'asc' ? ' ↑' : ' ↓')
+    : ' ↕';
 
   const sportiDisponibili = Array.from(new Set(tesserati.map(t => t.sport).filter((s): s is string => !!s)));
   const categorieDisponibili = Array.from(new Set(tesserati.map(t => t.categoria).filter((c): c is string => !!c)));
@@ -275,16 +307,17 @@ const Tesserati: React.FC = () => {
               <thead className="bg-blue-800 text-white">
                 <tr>
                   <th className="px-4 py-3 text-left">Foto</th>
-                  <th className="px-4 py-3 text-left">Nome</th>
-                  <th className="px-4 py-3 text-left">Cognome</th>
-                  <th className="px-4 py-3 text-left">Codice Fiscale</th>
-                  <th className="px-4 py-3 text-left">Categoria</th>
+                  <th className="px-4 py-3 text-left cursor-pointer select-none hover:bg-blue-700" onClick={() => toggleOrdinamento('nome')}>Nome{icona('nome')}</th>
+                  <th className="px-4 py-3 text-left cursor-pointer select-none hover:bg-blue-700" onClick={() => toggleOrdinamento('cognome')}>Cognome{icona('cognome')}</th>
+                  <th className="px-4 py-3 text-left cursor-pointer select-none hover:bg-blue-700" onClick={() => toggleOrdinamento('codice_fiscale')}>Codice Fiscale{icona('codice_fiscale')}</th>
+                  <th className="px-4 py-3 text-left cursor-pointer select-none hover:bg-blue-700" onClick={() => toggleOrdinamento('categoria')}>Categoria{icona('categoria')}</th>
+                  <th className="px-4 py-3 text-left cursor-pointer select-none hover:bg-blue-700" onClick={() => toggleOrdinamento('data_nascita')}>Nato{icona('data_nascita')}</th>
                   <th className="px-4 py-3 text-left">Telefono</th>
                   <th className="px-4 py-3 text-left">Azioni</th>
                 </tr>
               </thead>
               <tbody>
-                {filtrati.map((t, i) => (
+                {ordinati.map((t, i) => (
                   <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-4 py-2">
                       {t.foto_url
@@ -296,16 +329,18 @@ const Tesserati: React.FC = () => {
                     <td className="px-4 py-2">{t.cognome}</td>
                     <td className="px-4 py-2 font-mono text-xs">{t.codice_fiscale.startsWith('TEMP_') ? <span className="text-orange-500">{t.codice_fiscale}</span> : t.codice_fiscale}</td>
                     <td className="px-4 py-2">{t.categoria || '-'}</td>
+                    <td className="px-4 py-2 text-xs">{t.data_nascita ? new Date(t.data_nascita).getFullYear() : '-'}</td>
                     <td className="px-4 py-2">{t.telefono || t.cellulare || '-'}</td>
                     <td className="px-4 py-2 flex gap-2">
                       <button onClick={() => apriDettaglio(t)} className="text-green-600 hover:text-green-800 text-xs">Scheda</button>
                       <button onClick={() => apriModifica(t)} className="text-blue-600 hover:text-blue-800 text-xs">Modifica</button>
-                      <button onClick={() => handleElimina(t.id)} className="text-red-500 hover:text-red-700 text-xs">Disattiva</button>
+                      <button onClick={() => handleElimina(t.id)} className="text-orange-500 hover:text-orange-700 text-xs">Disattiva</button>
+                      <button onClick={() => handleEliminaDefinitivo(t.id, t.nome, t.cognome)} className="text-red-700 hover:text-red-900 text-xs font-bold">Elimina</button>
                     </td>
                   </tr>
                 ))}
                 {filtrati.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nessun tesserato trovato</td></tr>
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Nessun tesserato trovato</td></tr>
                 )}
               </tbody>
             </table>
