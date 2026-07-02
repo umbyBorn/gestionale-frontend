@@ -123,5 +123,3 @@ export const cambiaPassword = (utenteId: number, nuovaPassword: string) =>
 export const getSezioni = () => api.get('/admin/sezioni');
 
 export const getMessaggiTesserato = (tesseratoId: number) => api.get(`/messaggi/tesserato/${tesseratoId}`);
-
-export const getMessaggiTesserato = (tesseratoId: number) => api.get(`/messaggi/tesserato/${tesseratoId}`);
