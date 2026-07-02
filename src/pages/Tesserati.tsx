@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, eliminaTesseratoDefinitivo,
+  getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, eliminaTesseratoDefinitivo, getTuttiTesserati, riattivaTesserato,
   getGruppi, getGruppiTesserato, aggiornaGruppiTesserato,
   getGenitori, creaGenitore, aggiornaGenitore,
   caricaFoto, getDocumenti, caricaDocumento, eliminaDocumento
@@ -51,6 +51,7 @@ const Tesserati: React.FC = () => {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroCFTemp, setFiltroCFTemp] = useState(false);
   const [filtroTesseraScaduta, setFiltroTesseraScaduta] = useState(false);
+  const [mostraDisabilitati, setMostraDisabilitati] = useState(false);
   const [ordinamento, setOrdinamento] = useState<{campo: string, direzione: 'asc'|'desc'}>({campo: 'cognome', direzione: 'asc'});
   const [form, setForm] = useState(formVuoto);
   const [gruppiSelezionati, setGruppiSelezionati] = useState<number[]>([]);
@@ -64,12 +65,12 @@ const Tesserati: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
 
   const caricaTutti = () => {
-    getTesserati().then(r => { setTesserati(r.data); setLoading(false); });
+    (mostraDisabilitati ? getTuttiTesserati() : getTesserati()).then(r => { setTesserati(r.data); setLoading(false); });
     getGruppi().then(r => setGruppi(r.data));
     getGenitori().then(r => setGenitori(r.data));
   };
 
-  useEffect(() => { caricaTutti(); }, []);
+  useEffect(() => { caricaTutti(); }, [mostraDisabilitati]);
 
   const apriNuovo = () => {
     setEditingId(null); setForm(formVuoto); setGruppiSelezionati([]);
@@ -142,6 +143,13 @@ Sei sicuro?`)) {
         await eliminaTesseratoDefinitivo(id);
         caricaTutti();
       }
+    }
+  };
+
+  const handleRiattiva = async (id: number) => {
+    if (window.confirm('Vuoi riabilitare questo tesserato?')) {
+      await riattivaTesserato(id);
+      caricaTutti();
     }
   };
 
@@ -295,6 +303,13 @@ Sei sicuro?`)) {
               Solo tessere scadute
             </label>
           </div>
+          <div className="col-span-2 md:col-span-4 flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={mostraDisabilitati} onChange={e => setMostraDisabilitati(e.target.checked)} />
+              <span className="text-orange-600 font-medium">Mostra tesserati disabilitati</span>
+            </label>
+          </div>
+
           {(filtroGruppo || filtroSport || filtroCategoria || filtroAnnoNascita || filtroCFTemp || filtroTesseraScaduta) && (
             <div className="col-span-2 md:col-span-4 flex justify-end">
               <button onClick={() => { setFiltroGruppo(''); setFiltroSport(''); setFiltroCategoria(''); setFiltroAnnoNascita(''); setFiltroCFTemp(false); setFiltroTesseraScaduta(false); }}
@@ -322,7 +337,7 @@ Sei sicuro?`)) {
               </thead>
               <tbody>
                 {ordinati.map((t, i) => (
-                  <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <tr key={t.id} className={!t.attivo ? 'bg-red-50 opacity-60' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-4 py-2">
                       {t.foto_url
                         ? <img src={t.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
@@ -336,8 +351,14 @@ Sei sicuro?`)) {
                     <td className="px-4 py-2 text-xs">{t.data_nascita ? new Date(t.data_nascita).getFullYear() : '-'}</td>
                     <td className="px-4 py-2">{t.telefono || t.cellulare || '-'}</td>
                     <td className="px-4 py-2 flex gap-2">
-                      <button onClick={() => apriDettaglio(t)} className="text-green-600 hover:text-green-800 text-xs">Scheda</button>
-                      <button onClick={() => apriModifica(t)} className="text-blue-600 hover:text-blue-800 text-xs">Modifica</button>
+                      {t.attivo ? (
+                        <>
+                          <button onClick={() => apriDettaglio(t)} className="text-green-600 hover:text-green-800 text-xs">Scheda</button>
+                          <button onClick={() => apriModifica(t)} className="text-blue-600 hover:text-blue-800 text-xs">Modifica</button>
+                        </>
+                      ) : (
+                        <button onClick={() => handleRiattiva(t.id)} className="text-orange-600 hover:text-orange-800 text-xs font-medium">Riabilita</button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -488,10 +509,16 @@ Sei sicuro?`)) {
                 <div className="flex gap-2">
                   {sezioneAttiva > 0 && <button onClick={() => setSezioneAttiva(s => s - 1)} className="text-sm text-gray-600 hover:text-gray-800">← Indietro</button>}
                   {editingId && (
-                    <button onClick={() => handleEliminaDefinitivo(editingId, form.nome, form.cognome)}
-                      className="px-3 py-2 bg-red-700 text-white rounded text-xs hover:bg-red-900 ml-2">
-                      🗑 Elimina definitivamente
-                    </button>
+                    <div className="flex gap-2 ml-2">
+                      <button onClick={() => { handleElimina(editingId); setMostraForm(false); }}
+                        className="px-3 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-700">
+                        Disattiva
+                      </button>
+                      <button onClick={() => handleEliminaDefinitivo(editingId, form.nome, form.cognome)}
+                        className="px-3 py-2 bg-red-700 text-white rounded text-xs hover:bg-red-900">
+                        🗑 Elimina
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="flex gap-3">
