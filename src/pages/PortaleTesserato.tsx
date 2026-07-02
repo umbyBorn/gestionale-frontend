@@ -252,7 +252,7 @@ const PortaleTesserato: React.FC = () => {
         )}
 
         {/* ALLENAMENTI */}
-        {sezione === 5 && (
+        {sezione === 3 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="font-bold text-gray-800 mb-4">Prossimi eventi e allenamenti</h2>
             {eventi.length === 0 ? (
