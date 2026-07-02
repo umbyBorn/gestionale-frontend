@@ -121,3 +121,7 @@ export const toggleUtente = (utenteId: number, attivo: boolean) =>
 export const cambiaPassword = (utenteId: number, nuovaPassword: string) =>
   api.put(`/admin/utenti/${utenteId}/password?nuova_password=${nuovaPassword}`);
 export const getSezioni = () => api.get('/admin/sezioni');
+
+export const getMessaggiTesserato = (tesseratoId: number) => api.get(`/messaggi/tesserato/${tesseratoId}`);
+
+export const getMessaggiTesserato = (tesseratoId: number) => api.get(`/messaggi/tesserato/${tesseratoId}`);

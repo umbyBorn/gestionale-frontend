@@ -12,11 +12,13 @@ import Assemblee from './pages/Assemblee';
 import Calendario from './pages/Calendario';
 import Messaggi from './pages/Messaggi';
 import Admin from './pages/Admin';
+import PortaleTesserato from './pages/PortaleTesserato';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; sezione?: string }> = ({ children, sezione }) => {
-  const { utente, loading, hasPermesso } = useAuth();
+  const { utente, loading, hasPermesso, ruolo } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
   if (!utente) return <Navigate to="/login" />;
+  if (ruolo === 'tesserato') return <Navigate to="/portale" />;
   if (sezione && !hasPermesso(sezione)) return <Navigate to="/" />;
   return <>{children}</>;
 };
@@ -45,6 +47,7 @@ const App: React.FC = () => {
           <Route path="/calendario" element={<ProtectedRoute sezione="calendario"><Calendario /></ProtectedRoute>} />
           <Route path="/messaggi" element={<ProtectedRoute sezione="messaggi"><Messaggi /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+          <Route path="/portale" element={<ProtectedRoute><PortaleTesserato /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
