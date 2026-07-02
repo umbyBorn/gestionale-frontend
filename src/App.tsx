@@ -14,6 +14,13 @@ import Messaggi from './pages/Messaggi';
 import Admin from './pages/Admin';
 import PortaleTesserato from './pages/PortaleTesserato';
 
+const RequireLogin: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { utente, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
+  if (!utente) return <Navigate to="/login" />;
+  return <>{children}</>;
+};
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode; sezione?: string }> = ({ children, sezione }) => {
   const { utente, loading, hasPermesso, ruolo } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
@@ -47,7 +54,7 @@ const App: React.FC = () => {
           <Route path="/calendario" element={<ProtectedRoute sezione="calendario"><Calendario /></ProtectedRoute>} />
           <Route path="/messaggi" element={<ProtectedRoute sezione="messaggi"><Messaggi /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
-          <Route path="/portale" element={<ProtectedRoute><PortaleTesserato /></ProtectedRoute>} />
+          <Route path="/portale" element={<RequireLogin><PortaleTesserato /></RequireLogin>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

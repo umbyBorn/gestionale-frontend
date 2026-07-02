@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const permessiSalvati = localStorage.getItem('permessi');
     if (token) {
       if (ruoloSalvato) setRuolo(ruoloSalvato);
-      if (tesseratoIdSalvato) setTesseratoId(parseInt(tesseratoIdSalvato));
+      if (tesseratoIdSalvato && tesseratoIdSalvato !== 'null') setTesseratoId(parseInt(tesseratoIdSalvato));
       if (permessiSalvati) setPermessi(JSON.parse(permessiSalvati));
       getMe()
         .then((res) => setUtente(res.data))
