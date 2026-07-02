@@ -82,6 +82,7 @@ const PortaleTesserato: React.FC = () => {
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }));
 
+  console.log('PortaleTesserato render - loading:', loading, 'tesseratoId:', tesseratoId, 'utente:', utente?.email);
   if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
 
   if (!tesseratoId) return (
