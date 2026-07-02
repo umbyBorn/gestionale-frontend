@@ -7,7 +7,8 @@ interface Tesserato {
   codice_fiscale: string; email?: string; telefono?: string; cellulare?: string;
   indirizzo?: string; comune_residenza?: string; provincia_residenza?: string;
   cap_residenza?: string; foto_url?: string; categoria?: string;
-  cod_tessera?: string; data_scadenza_tessera?: string;
+  cod_tessera?: string; tipo_tessera?: string; qualifica?: string; sport?: string;
+  matricola?: string; data_emissione_tessera?: string; data_scadenza_tessera?: string;
 }
 
 interface Evento {
