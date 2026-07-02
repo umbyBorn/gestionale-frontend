@@ -141,7 +141,11 @@ Questa operazione è irreversibile e cancellerà anche tutti i documenti associa
 Sei sicuro?`)) {
       if (window.confirm(`Ultima conferma: eliminare definitivamente ${nome} ${cognome}?`)) {
         await eliminaTesseratoDefinitivo(id);
+        setMostraForm(false);
+        setEditingId(null);
+        setForm(formVuoto);
         caricaTutti();
+        alert(`${nome} ${cognome} è stato eliminato definitivamente.`);
       }
     }
   };
@@ -592,9 +596,9 @@ Sei sicuro?`)) {
                           </div>
                           <div className="flex gap-3">
                             <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">
-                              {d.nome_file.toLowerCase().endsWith('.pdf') ? '📄 Apri PDF' : '🖼 Apri'}
+                              {d.nome_file.toLowerCase().endsWith('.pdf') ? '📄 Apri' : '🖼 Apri'}
                             </a>
-                            <a href={d.url.replace('/upload/', '/upload/fl_attachment/')} className="text-green-600 hover:text-green-800 text-xs">⬇ Scarica</a>
+                            <a href={d.url} download target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-800 text-xs">⬇ Scarica</a>
                             <button onClick={() => handleEliminaDoc(d.id)} className="text-red-500 hover:text-red-700 text-xs">Elimina</button>
                           </div>
                         </div>
