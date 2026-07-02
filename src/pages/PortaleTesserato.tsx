@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getTesserato, aggiornaTesserato, getEventi, getMessaggiTesserato, getPagamenti } from '../services/api';
+import { getTesserato, aggiornaTesserato, getEventi, getMessaggiTesserato, getPagamenti, getDocumenti } from '../services/api';
 
 interface Tesserato {
   id: number; nome: string; cognome: string; data_nascita: string;
@@ -24,7 +24,7 @@ interface Pagamento {
   data_pagamento?: string;
 }
 
-const SEZIONI = ['Profilo', 'Allenamenti', 'Messaggi', 'Pagamenti'];
+const SEZIONI = ['Profilo', 'Tessera', 'Documenti', 'Allenamenti', 'Messaggi', 'Pagamenti'];
 
 const PortaleTesserato: React.FC = () => {
   const { utente, logout, tesseratoId } = useAuth();
@@ -37,6 +37,7 @@ const PortaleTesserato: React.FC = () => {
   const [modifica, setModifica] = useState(false);
   const [form, setForm] = useState<Partial<Tesserato>>({});
   const [salvando, setSalvando] = useState(false);
+  const [documenti, setDocumenti] = useState<any[]>([]);
 
   useEffect(() => {
     if (!tesseratoId) { setLoading(false); return; }
@@ -62,6 +63,9 @@ const PortaleTesserato: React.FC = () => {
         // solo i pagamenti di questo tesserato - il backend li filtra già per utente
         return true;
       }));
+      if (tesseratoId) {
+        getDocumenti(tesseratoId).then(d => setDocumenti(d.data));
+      }
       setLoading(false);
     });
   }, [tesseratoId]);
@@ -188,8 +192,66 @@ const PortaleTesserato: React.FC = () => {
           </div>
         )}
 
-        {/* ALLENAMENTI */}
+        {/* TESSERA */}
         {sezione === 1 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="font-bold text-gray-800 mb-4">Dati tessera federale</h2>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {[
+                ['Cod. Tessera', tesserato?.cod_tessera],
+                ['Tipo tessera', tesserato?.tipo_tessera],
+                ['Categoria', tesserato?.categoria],
+                ['Qualifica', tesserato?.qualifica],
+                ['Sport', tesserato?.sport],
+                ['Matricola', tesserato?.matricola],
+                ['Data emissione', tesserato?.data_emissione_tessera],
+                ['Data scadenza', tesserato?.data_scadenza_tessera],
+              ].map(([label, val]) => val ? (
+                <div key={label as string}>
+                  <span className="text-gray-500 text-xs block">{label as string}</span>
+                  <p className={`font-medium ${label === 'Data scadenza' && new Date(val as string) < new Date() ? 'text-red-600' : 'text-gray-800'}`}>
+                    {val as string}
+                    {label === 'Data scadenza' && new Date(val as string) < new Date() && ' ⚠️ SCADUTA'}
+                  </p>
+                </div>
+              ) : null)}
+            </div>
+          </div>
+        )}
+
+        {/* DOCUMENTI */}
+        {sezione === 2 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="font-bold text-gray-800 mb-4">I miei documenti</h2>
+            {documenti.length === 0 ? (
+              <p className="text-gray-400 text-sm">Nessun documento caricato</p>
+            ) : (
+              <div className="space-y-2">
+                {documenti.map((d: any) => (
+                  <div key={d.id} className="flex justify-between items-center bg-gray-50 rounded px-3 py-2 text-sm">
+                    <div>
+                      <span className="font-medium">{d.tipo}</span>
+                      <span className="text-gray-500 ml-2 text-xs">{d.nome_file}</span>
+                      {d.data_scadenza && (
+                        <span className={`ml-2 text-xs ${new Date(d.data_scadenza) < new Date() ? 'text-red-500' : 'text-orange-500'}`}>
+                          scad. {d.data_scadenza}
+                          {new Date(d.data_scadenza) < new Date() && ' ⚠️'}
+                        </span>
+                      )}
+                    </div>
+                    <a href={d.url} target="_blank" rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 text-xs">
+                      {d.nome_file.toLowerCase().endsWith('.pdf') ? '📄 Apri' : '🖼 Apri'}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ALLENAMENTI */}
+        {sezione === 5 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="font-bold text-gray-800 mb-4">Prossimi eventi e allenamenti</h2>
             {eventi.length === 0 ? (
@@ -222,7 +284,7 @@ const PortaleTesserato: React.FC = () => {
         )}
 
         {/* MESSAGGI */}
-        {sezione === 2 && (
+        {sezione === 4 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="font-bold text-gray-800 mb-4">Messaggi ricevuti</h2>
             {messaggi.length === 0 ? (
@@ -244,7 +306,7 @@ const PortaleTesserato: React.FC = () => {
         )}
 
         {/* PAGAMENTI */}
-        {sezione === 3 && (
+        {sezione === 5 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="font-bold text-gray-800 mb-4">I miei pagamenti</h2>
             {pagamenti.length === 0 ? (
