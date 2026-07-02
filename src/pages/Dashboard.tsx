@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { getTesserati, getGruppi, getPagamentiScaduti, getStaff } from '../services/api';
 
 const Dashboard: React.FC = () => {
-  const { utente, logout } = useAuth();
+  const { utente, logout, hasPermesso, ruolo } = useAuth();
   const [stats, setStats] = useState({ tesserati: 0, gruppi: 0, pagamentiScaduti: 0, staff: 0 });
 
   useEffect(() => {
@@ -14,14 +14,14 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const menu = [
-    { titolo: 'Tesserati', descrizione: 'Gestisci le schede anagrafiche', href: '/tesserati', colore: 'bg-blue-50 border-blue-200' },
-    { titolo: 'Gruppi', descrizione: 'Organizza i corsi e le squadre', href: '/gruppi', colore: 'bg-green-50 border-green-200' },
-    { titolo: 'Pagamenti', descrizione: 'Gestisci quote e incassi', href: '/pagamenti', colore: 'bg-yellow-50 border-yellow-200' },
-    { titolo: 'Staff', descrizione: 'Gestisci collaboratori e contratti', href: '/staff', colore: 'bg-purple-50 border-purple-200' },
-    { titolo: 'Presenze', descrizione: 'Registra le presenze agli allenamenti', href: '/presenze', colore: 'bg-orange-50 border-orange-200' },
-    { titolo: 'Assemblee', descrizione: 'Gestisci assemblee e verbali', href: '/assemblee', colore: 'bg-red-50 border-red-200' },
-    { titolo: 'Calendario', descrizione: 'Gestisci eventi e allenamenti', href: '/calendario', colore: 'bg-teal-50 border-teal-200' },
-    { titolo: 'Messaggi', descrizione: 'Invia comunicazioni broadcast ai tesserati', href: '/messaggi', colore: 'bg-pink-50 border-pink-200' },
+    { titolo: 'Tesserati', descrizione: 'Gestisci le schede anagrafiche', href: '/tesserati', colore: 'bg-blue-50 border-blue-200', sezione: 'tesserati' },
+    { titolo: 'Gruppi', descrizione: 'Organizza i corsi e le squadre', href: '/gruppi', colore: 'bg-green-50 border-green-200', sezione: 'gruppi' },
+    { titolo: 'Pagamenti', descrizione: 'Gestisci quote e incassi', href: '/pagamenti', colore: 'bg-yellow-50 border-yellow-200', sezione: 'pagamenti' },
+    { titolo: 'Staff', descrizione: 'Gestisci collaboratori e contratti', href: '/staff', colore: 'bg-purple-50 border-purple-200', sezione: 'staff' },
+    { titolo: 'Presenze', descrizione: 'Registra le presenze agli allenamenti', href: '/presenze', colore: 'bg-orange-50 border-orange-200', sezione: 'presenze' },
+    { titolo: 'Assemblee', descrizione: 'Gestisci assemblee e verbali', href: '/assemblee', colore: 'bg-red-50 border-red-200', sezione: 'assemblee' },
+    { titolo: 'Calendario', descrizione: 'Gestisci eventi e allenamenti', href: '/calendario', colore: 'bg-teal-50 border-teal-200', sezione: 'calendario' },
+    { titolo: 'Messaggi', descrizione: 'Invia comunicazioni broadcast ai tesserati', href: '/messaggi', colore: 'bg-pink-50 border-pink-200', sezione: 'messaggi' },
   ];
 
   return (
@@ -30,6 +30,9 @@ const Dashboard: React.FC = () => {
         <h1 className="text-xl font-bold">Gestionale Sportivo</h1>
         <div className="flex items-center gap-4">
           <span className="text-sm">{utente?.email}</span>
+          {ruolo === 'amministratore' && (
+            <a href="/admin" className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">Utenti</a>
+          )}
           <button onClick={logout} className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">Esci</button>
         </div>
       </header>
@@ -54,7 +57,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {menu.map((item) => (
+          {menu.filter(item => hasPermesso(item.sezione)).map((item) => (
             <a key={item.href} href={item.href} className={`border rounded-lg p-4 hover:shadow-md transition ${item.colore}`}>
               <h3 className="font-bold text-gray-800">{item.titolo}</h3>
               <p className="text-sm text-gray-500 mt-1">{item.descrizione}</p>

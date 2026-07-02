@@ -11,11 +11,21 @@ import Presenze from './pages/Presenze';
 import Assemblee from './pages/Assemblee';
 import Calendario from './pages/Calendario';
 import Messaggi from './pages/Messaggi';
+import Admin from './pages/Admin';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { utente, loading } = useAuth();
+const ProtectedRoute: React.FC<{ children: React.ReactNode; sezione?: string }> = ({ children, sezione }) => {
+  const { utente, loading, hasPermesso } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
   if (!utente) return <Navigate to="/login" />;
+  if (sezione && !hasPermesso(sezione)) return <Navigate to="/" />;
+  return <>{children}</>;
+};
+
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { utente, loading, ruolo } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
+  if (!utente) return <Navigate to="/login" />;
+  if (ruolo !== 'amministratore') return <Navigate to="/" />;
   return <>{children}</>;
 };
 
@@ -26,14 +36,15 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/tesserati" element={<ProtectedRoute><Tesserati /></ProtectedRoute>} />
-          <Route path="/gruppi" element={<ProtectedRoute><Gruppi /></ProtectedRoute>} />
-          <Route path="/pagamenti" element={<ProtectedRoute><Pagamenti /></ProtectedRoute>} />
-          <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
-          <Route path="/presenze" element={<ProtectedRoute><Presenze /></ProtectedRoute>} />
-          <Route path="/assemblee" element={<ProtectedRoute><Assemblee /></ProtectedRoute>} />
-          <Route path="/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
-          <Route path="/messaggi" element={<ProtectedRoute><Messaggi /></ProtectedRoute>} />
+          <Route path="/tesserati" element={<ProtectedRoute sezione="tesserati"><Tesserati /></ProtectedRoute>} />
+          <Route path="/gruppi" element={<ProtectedRoute sezione="gruppi"><Gruppi /></ProtectedRoute>} />
+          <Route path="/pagamenti" element={<ProtectedRoute sezione="pagamenti"><Pagamenti /></ProtectedRoute>} />
+          <Route path="/staff" element={<ProtectedRoute sezione="staff"><Staff /></ProtectedRoute>} />
+          <Route path="/presenze" element={<ProtectedRoute sezione="presenze"><Presenze /></ProtectedRoute>} />
+          <Route path="/assemblee" element={<ProtectedRoute sezione="assemblee"><Assemblee /></ProtectedRoute>} />
+          <Route path="/calendario" element={<ProtectedRoute sezione="calendario"><Calendario /></ProtectedRoute>} />
+          <Route path="/messaggi" element={<ProtectedRoute sezione="messaggi"><Messaggi /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

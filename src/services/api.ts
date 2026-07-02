@@ -110,3 +110,14 @@ export const caricaDocumento = (tesseratoId: number, tipo: string, file: File, d
 export const eliminaDocumento = (documentoId: number) => api.delete(`/tesserati/documenti/${documentoId}`);
 
 export const eliminaTesseratoDefinitivo = (id: number) => api.delete(`/tesserati/${id}/definitivo`);
+
+// ---- ADMIN ----
+export const getUtenti = () => api.get('/admin/utenti');
+export const creaUtente = (data: any) => api.post('/admin/utenti', data);
+export const aggiornaPermesso = (utenteId: number, sezione: string, abilitato: boolean) =>
+  api.put(`/admin/utenti/${utenteId}/permesso`, { sezione, abilitato });
+export const toggleUtente = (utenteId: number, attivo: boolean) =>
+  api.put(`/admin/utenti/${utenteId}/attivo?attivo=${attivo}`);
+export const cambiaPassword = (utenteId: number, nuovaPassword: string) =>
+  api.put(`/admin/utenti/${utenteId}/password?nuova_password=${nuovaPassword}`);
+export const getSezioni = () => api.get('/admin/sezioni');
