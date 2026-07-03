@@ -52,6 +52,8 @@ export const usePushNotifications = (utenteId?: number, tesseratoId?: number) =>
       console.log('[PUSH] Service worker pronto');
       const subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
       const subJson = subscription.toJSON();
+      console.log('[PUSH] subJson:', JSON.stringify(subJson));
+      alert('[PUSH] subJson: ' + JSON.stringify(subJson));
       await subscribePush({
         endpoint: subJson.endpoint,
         p256dh: subJson.keys?.p256dh,
