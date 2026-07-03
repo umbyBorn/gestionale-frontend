@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getTesserato, aggiornaTesserato, getEventi, getMessaggiTesserato, getPagamenti, getDocumenti } from '../services/api';
 
 interface Tesserato {
@@ -29,6 +30,7 @@ const SEZIONI = ['Profilo', 'Tessera', 'Documenti', 'Allenamenti', 'Messaggi', '
 
 const PortaleTesserato: React.FC = () => {
   const { utente, logout, tesseratoId } = useAuth();
+  const { iscritto, attivaPush } = usePushNotifications(utente?.id, tesseratoId || undefined);
   const [sezione, setSezione] = useState(0);
   const [tesserato, setTesserato] = useState<Tesserato | null>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
@@ -115,7 +117,15 @@ const PortaleTesserato: React.FC = () => {
             <p className="text-xs text-blue-200">{utente?.email}</p>
           </div>
         </div>
-        <button onClick={logout} className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">Esci</button>
+        <div className="flex items-center gap-2">
+          {!iscritto && (
+            <button onClick={attivaPush} className="bg-yellow-500 hover:bg-yellow-400 px-3 py-1 rounded text-sm text-white">
+              🔔 Attiva notifiche
+            </button>
+          )}
+          {iscritto && <span className="text-xs text-blue-200">🔔</span>}
+          <button onClick={logout} className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">Esci</button>
+        </div>
       </header>
 
       {/* TESSERA INFO */}

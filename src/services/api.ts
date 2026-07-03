@@ -127,3 +127,8 @@ export const getMessaggiTesserato = (tesseratoId: number) => api.get(`/messaggi/
 export const getTuttiTesserati = () => api.get('/tesserati/tutti');
 
 export const riattivaTesserato = (id: number) => api.put(`/tesserati/${id}/riattiva`);
+
+// ---- PUSH NOTIFICATIONS ----
+export const getVapidPublicKey = () => api.get('/push/vapid-public-key');
+export const subscribePush = (data: any) => api.post('/push/subscribe', data);
+export const unsubscribePush = (endpoint: string) => api.delete(`/push/unsubscribe?endpoint=${encodeURIComponent(endpoint)}`);
