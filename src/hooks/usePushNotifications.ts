@@ -43,8 +43,13 @@ export const usePushNotifications = (utenteId?: number, tesseratoId?: number) =>
     if (permessoRichiesto !== 'granted') { alert('Permesso notifiche negato'); return; }
     try {
       const keyRes = await getVapidPublicKey();
-      const applicationServerKey = urlBase64ToUint8Array(keyRes.data.public_key);
+      const publicKey = keyRes.data.public_key;
+      console.log('[PUSH] Chiave pubblica ricevuta:', publicKey);
+      console.log('[PUSH] Lunghezza chiave:', publicKey.length);
+      const applicationServerKey = urlBase64ToUint8Array(publicKey);
+      console.log('[PUSH] applicationServerKey length:', applicationServerKey.length);
       const reg = await navigator.serviceWorker.ready;
+      console.log('[PUSH] Service worker pronto');
       const subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
       const subJson = subscription.toJSON();
       await subscribePush({
@@ -56,9 +61,9 @@ export const usePushNotifications = (utenteId?: number, tesseratoId?: number) =>
       });
       setIscritto(true);
       alert('Notifiche push attivate!');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Errore push:', e);
-      alert('Errore durante l\'attivazione delle notifiche');
+      alert('Errore push: ' + (e?.message || e?.name || String(e)));
     }
   };
 
