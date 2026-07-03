@@ -43,8 +43,7 @@ export const usePushNotifications = (utenteId?: number, tesseratoId?: number) =>
     if (permessoRichiesto !== 'granted') { alert('Permesso notifiche negato'); return; }
     try {
       const keyRes = await getVapidPublicKey();
-      const publicKeyBase64 = hexToBase64Url(keyRes.data.public_key);
-      const applicationServerKey = urlBase64ToUint8Array(publicKeyBase64);
+      const applicationServerKey = urlBase64ToUint8Array(keyRes.data.public_key);
       const reg = await navigator.serviceWorker.ready;
       const subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
       const subJson = subscription.toJSON();
