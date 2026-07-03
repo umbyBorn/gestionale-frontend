@@ -52,15 +52,15 @@ export const usePushNotifications = (utenteId?: number, tesseratoId?: number) =>
       console.log('[PUSH] Service worker pronto');
       const subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
       const subJson = subscription.toJSON();
-      console.log('[PUSH] subJson:', JSON.stringify(subJson));
-      alert('[PUSH] subJson: ' + JSON.stringify(subJson));
-      await subscribePush({
+      const payload = {
         endpoint: subJson.endpoint,
         p256dh: subJson.keys?.p256dh,
         auth: subJson.keys?.auth,
         utente_id: utenteId || null,
         tesserato_id: tesseratoId || null
-      });
+      };
+      alert('Payload: ' + JSON.stringify(payload));
+      await subscribePush(payload);
       setIscritto(true);
       alert('Notifiche push attivate!');
     } catch (e: any) {
