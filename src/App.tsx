@@ -50,8 +50,10 @@ const App: React.FC = () => {
           <Route path="/assemblee" element={<RouteGuard titolo="Assemblee" sezione="assemblee"><Assemblee /></RouteGuard>} />
           <Route path="/calendario" element={<RouteGuard titolo="Calendario" sezione="calendario"><Calendario /></RouteGuard>} />
           <Route path="/messaggi" element={<RouteGuard titolo="Messaggi" sezione="messaggi"><Messaggi /></RouteGuard>} />
+          <Route path="/prima-nota" element={<RouteGuard titolo="Prima nota" sezione="pagamenti"><div className="p-6"><div className="bg-white rounded-lg shadow p-8 text-center"><p className="text-gray-400 text-lg mb-2">📒 Prima nota</p><p className="text-gray-500 text-sm">Funzionalità in arrivo — registra tutte le entrate e uscite dell'associazione</p></div></div></RouteGuard>} />
+          <Route path="/rendiconto" element={<RouteGuard titolo="Rendiconto" sezione="pagamenti"><div className="p-6"><div className="bg-white rounded-lg shadow p-8 text-center"><p className="text-gray-400 text-lg mb-2">📊 Rendiconto economico</p><p className="text-gray-500 text-sm">Funzionalità in arrivo — visualizza il bilancio entrate/uscite per periodo</p></div></div></RouteGuard>} />
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
-          <Route path="/import" element={<RouteGuard titolo="Importazione" sezione="tesserati"><div className="p-6 text-gray-500">Usa il pulsante Importa CSV/Excel dalla pagina Tesserati</div></RouteGuard>} />
+          <Route path="/import" element={<Navigate to="/tesserati" />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
