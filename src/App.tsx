@@ -51,6 +51,7 @@ const App: React.FC = () => {
           <Route path="/calendario" element={<RouteGuard titolo="Calendario" sezione="calendario"><Calendario /></RouteGuard>} />
           <Route path="/messaggi" element={<RouteGuard titolo="Messaggi" sezione="messaggi"><Messaggi /></RouteGuard>} />
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
+          <Route path="/import" element={<RouteGuard titolo="Importazione" sezione="tesserati"><div className="p-6 text-gray-500">Usa il pulsante Importa CSV/Excel dalla pagina Tesserati</div></RouteGuard>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
