@@ -103,7 +103,13 @@ const Admin: React.FC = () => {
 
             {/* LISTA UTENTI */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="font-bold text-gray-800 mb-3 text-sm">Utenti registrati ({utenti.length})</h2>
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="font-bold text-gray-800 text-sm">Utenti registrati ({utenti.length})</h2>
+                <button onClick={() => setMostraForm(true)}
+                  className="bg-blue-700 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-800">
+                  + Nuovo
+                </button>
+              </div>
               <div className="space-y-2">
                 {utenti.map(u => (
                   <div key={u.id}
