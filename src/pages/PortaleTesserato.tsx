@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-import { getTesserato, aggiornaTesserato, getEventi, getMessaggiTesserato, getPagamenti, getDocumenti } from '../services/api';
+import {
+  getTesserato, aggiornaTesserato, getEventi, getMessaggiTesserato,
+  getPagamenti, getDocumenti, getCompagniGruppo, getStatisticheTesserato,
+  getPresenzeTesserato, registraPresenza
+} from '../services/api';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Tesserato {
   id: number; nome: string; cognome: string; data_nascita: string;
@@ -11,36 +16,51 @@ interface Tesserato {
   cod_tessera?: string; tipo_tessera?: string; qualifica?: string; sport?: string;
   matricola?: string; data_emissione_tessera?: string; data_scadenza_tessera?: string;
 }
+interface Evento { id: number; titolo: string; data: string; tipo: string; ora_inizio?: string; ora_fine?: string; luogo?: string; gruppo_id: number; }
+interface Messaggio { id: number; intestazione: string; corpo: string; data_invio: string; }
+interface Pagamento { id: number; importo: number; data_scadenza: string; pagato: boolean; }
+interface Documento { id: number; tipo: string; nome_file: string; url: string; data_scadenza?: string; }
+interface Compagno { id: number; nome: string; cognome: string; foto_url?: string; categoria?: string; }
+interface Statistiche { totale_eventi: number; presenze: number; assenze: number; non_registrate: number; percentuale: number; streak: number; }
+interface Presenza { id: number; evento_id: number; presente: boolean; }
 
-interface Evento {
-  id: number; titolo: string; data: string; tipo: string;
-  ora_inizio?: string; ora_fine?: string; luogo?: string;
-}
+const SEZIONI = [
+  { id: 'home', label: '🏠', titolo: 'Home' },
+  { id: 'profilo', label: '👤', titolo: 'Profilo' },
+  { id: 'tessera', label: '🎫', titolo: 'Tessera' },
+  { id: 'allenamenti', label: '📅', titolo: 'Allenamenti' },
+  { id: 'statistiche', label: '📊', titolo: 'Statistiche' },
+  { id: 'compagni', label: '👥', titolo: 'Compagni' },
+  { id: 'documenti', label: '📁', titolo: 'Documenti' },
+  { id: 'messaggi', label: '📢', titolo: 'Messaggi' },
+  { id: 'pagamenti', label: '💳', titolo: 'Pagamenti' },
+];
 
-interface Messaggio {
-  id: number; intestazione: string; corpo: string; data_invio: string;
-}
-
-interface Pagamento {
-  id: number; importo: number; data_scadenza: string; pagato: boolean;
-  data_pagamento?: string;
-}
-
-const SEZIONI = ['Profilo', 'Tessera', 'Documenti', 'Allenamenti', 'Messaggi', 'Pagamenti'];
+const TIPO_COLORE: Record<string, string> = {
+  allenamento: 'bg-blue-100 text-blue-700',
+  partita: 'bg-red-100 text-red-700',
+  raduno: 'bg-green-100 text-green-700',
+  altro: 'bg-gray-100 text-gray-600',
+};
 
 const PortaleTesserato: React.FC = () => {
   const { utente, logout, tesseratoId } = useAuth();
   const { iscritto, attivaPush } = usePushNotifications(utente?.id, tesseratoId || undefined);
-  const [sezione, setSezione] = useState(0);
+  const [sezione, setSezione] = useState('home');
   const [tesserato, setTesserato] = useState<Tesserato | null>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [messaggi, setMessaggi] = useState<Messaggio[]>([]);
   const [pagamenti, setPagamenti] = useState<Pagamento[]>([]);
+  const [documenti, setDocumenti] = useState<Documento[]>([]);
+  const [compagni, setCompagni] = useState<Compagno[]>([]);
+  const [statistiche, setStatistiche] = useState<Statistiche | null>(null);
+  const [presenze, setPresenze] = useState<Presenza[]>([]);
   const [loading, setLoading] = useState(true);
   const [modifica, setModifica] = useState(false);
   const [form, setForm] = useState<Partial<Tesserato>>({});
   const [salvando, setSalvando] = useState(false);
-  const [documenti, setDocumenti] = useState<any[]>([]);
+
+  const oggi = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     if (!tesseratoId) { setLoading(false); return; }
@@ -48,302 +68,559 @@ const PortaleTesserato: React.FC = () => {
       getTesserato(tesseratoId),
       getEventi(),
       getMessaggiTesserato(tesseratoId),
-      getPagamenti()
-    ]).then(([t, e, m, p]) => {
+      getPagamenti(),
+      getDocumenti(tesseratoId),
+      getCompagniGruppo(tesseratoId),
+      getStatisticheTesserato(tesseratoId),
+      getPresenzeTesserato(tesseratoId),
+    ]).then(([t, e, m, p, d, c, s, pr]) => {
       setTesserato(t.data);
       setForm({
-        email: t.data.email || '',
-        telefono: t.data.telefono || '',
-        cellulare: t.data.cellulare || '',
-        indirizzo: t.data.indirizzo || '',
+        email: t.data.email || '', telefono: t.data.telefono || '',
+        cellulare: t.data.cellulare || '', indirizzo: t.data.indirizzo || '',
         comune_residenza: t.data.comune_residenza || '',
         provincia_residenza: t.data.provincia_residenza || '',
         cap_residenza: t.data.cap_residenza || '',
       });
-      setEventi(e.data.filter((ev: Evento) => new Date(ev.data) >= new Date(new Date().setMonth(new Date().getMonth() - 1))));
+      setEventi(e.data.sort((a: Evento, b: Evento) => a.data.localeCompare(b.data)));
       setMessaggi(m.data);
-      setPagamenti(p.data.filter((pag: Pagamento) => {
-        // solo i pagamenti di questo tesserato - il backend li filtra già per utente
-        return true;
-      }));
-      if (tesseratoId) {
-        getDocumenti(tesseratoId).then(d => setDocumenti(d.data));
-      }
+      setPagamenti(p.data);
+      setDocumenti(d.data);
+      setCompagni(c.data);
+      setStatistiche(s.data);
+      setPresenze(pr.data);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [tesseratoId]);
 
   const handleSalva = async () => {
     if (!tesseratoId || !tesserato) return;
     setSalvando(true);
     try {
-      const datiAggiornati = { ...tesserato, ...form };
-      await aggiornaTesserato(tesseratoId, datiAggiornati);
+      const aggiornato = { ...tesserato, ...form };
+      await aggiornaTesserato(tesseratoId, aggiornato);
       setTesserato(prev => prev ? { ...prev, ...form } : prev);
       setModifica(false);
-    } catch (e) {
-      alert('Errore nel salvataggio');
-    } finally { setSalvando(false); }
+    } catch { alert('Errore nel salvataggio'); }
+    finally { setSalvando(false); }
+  };
+
+  const getPresenza = (eventoId: number) => presenze.find(p => p.evento_id === eventoId);
+
+  const togglePresenza = async (eventoId: number, presente: boolean) => {
+    if (!tesseratoId) return;
+    await registraPresenza({ evento_id: eventoId, tesserato_id: tesseratoId, presente });
+    const res = await getPresenzeTesserato(tesseratoId);
+    setPresenze(res.data);
+  };
+
+  const giorniAllaScadenza = () => {
+    if (!tesserato?.data_scadenza_tessera) return null;
+    const scadenza = new Date(tesserato.data_scadenza_tessera);
+    const diff = Math.ceil((scadenza.getTime() - new Date().getTime()) / 86400000);
+    return diff;
+  };
+
+  const scadenzaVisitaMedica = () => {
+    const docVisita = documenti.find(d => d.tipo.toLowerCase().includes('idoneit'));
+    if (!docVisita?.data_scadenza) return null;
+    const diff = Math.ceil((new Date(docVisita.data_scadenza).getTime() - new Date().getTime()) / 86400000);
+    return { giorni: diff, data: docVisita.data_scadenza };
   };
 
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }));
 
-  console.log('PortaleTesserato render - loading:', loading, 'tesseratoId:', tesseratoId, 'utente:', utente?.email);
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
+  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">Caricamento...</p></div>;
 
   if (!tesseratoId) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white rounded-lg shadow p-8 max-w-md text-center">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow p-8 max-w-md text-center">
+        <p className="text-4xl mb-4">⚠️</p>
         <h2 className="text-xl font-bold text-gray-800 mb-2">Account non collegato</h2>
-        <p className="text-gray-500 text-sm">Il tuo account non è ancora collegato a nessuna scheda tesserato. Contatta l'amministratore.</p>
-        <button onClick={logout} className="mt-4 px-4 py-2 bg-blue-700 text-white rounded text-sm">Esci</button>
+        <p className="text-gray-500 text-sm">Contatta l'amministratore per collegare il tuo account alla scheda tesserato.</p>
+        <button onClick={logout} className="mt-4 px-4 py-2 bg-blue-700 text-white rounded-lg text-sm">Esci</button>
       </div>
     </div>
   );
 
+  const visitaMedica = scadenzaVisitaMedica();
+  const giorniTessera = giorniAllaScadenza();
+  const prossimiEventi = eventi.filter(e => e.data >= oggi);
+  const pagamentiDaPagare = pagamenti.filter(p => !p.pagato);
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-800 text-white px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          {tesserato?.foto_url
-            ? <img src={tesserato.foto_url} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white" />
-            : <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
-                {tesserato?.nome[0]}{tesserato?.cognome[0]}
-              </div>
-          }
-          <div>
-            <h1 className="text-lg font-bold">{tesserato?.nome} {tesserato?.cognome}</h1>
-            <p className="text-xs text-blue-200">{utente?.email}</p>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* HEADER */}
+      <header className="bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-4">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {tesserato?.foto_url
+              ? <img src={tesserato.foto_url} alt="" className="w-11 h-11 rounded-full object-cover border-2 border-white/30" />
+              : <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-lg font-bold">
+                  {tesserato?.nome?.[0]}{tesserato?.cognome?.[0]}
+                </div>
+            }
+            <div>
+              <p className="font-bold text-white">{tesserato?.nome} {tesserato?.cognome}</p>
+              <p className="text-xs text-blue-200">{tesserato?.categoria || 'Tesserato'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!iscritto && (
+              <button onClick={attivaPush} className="text-yellow-300 text-lg" title="Attiva notifiche">🔔</button>
+            )}
+            <button onClick={logout} className="text-blue-200 hover:text-white text-sm px-2 py-1">Esci</button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {!iscritto && (
-            <button onClick={attivaPush} className="bg-yellow-500 hover:bg-yellow-400 px-3 py-1 rounded text-sm text-white">
-              🔔 Attiva notifiche
-            </button>
+
+        {/* BANNER AVVISI */}
+        <div className="max-w-lg mx-auto mt-3 space-y-2">
+          {visitaMedica && visitaMedica.giorni <= 30 && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${visitaMedica.giorni <= 7 ? 'bg-red-500' : 'bg-yellow-500'}`}>
+              <span>🏥</span>
+              <span className="font-medium">
+                {visitaMedica.giorni <= 0
+                  ? 'Visita medica SCADUTA — rinnova subito!'
+                  : `Visita medica scade tra ${visitaMedica.giorni} giorni (${visitaMedica.data})`}
+              </span>
+            </div>
           )}
-          {iscritto && <span className="text-xs text-blue-200">🔔</span>}
-          <button onClick={logout} className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">Esci</button>
+          {giorniTessera !== null && giorniTessera <= 30 && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${giorniTessera <= 0 ? 'bg-red-500' : 'bg-orange-500'}`}>
+              <span>🎫</span>
+              <span className="font-medium">
+                {giorniTessera <= 0 ? 'Tessera federale SCADUTA!' : `Tessera scade tra ${giorniTessera} giorni`}
+              </span>
+            </div>
+          )}
+          {pagamentiDaPagare.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs bg-red-500">
+              <span>💳</span>
+              <span className="font-medium">{pagamentiDaPagare.length} pagamenti in sospeso — totale € {pagamentiDaPagare.reduce((a, p) => a + p.importo, 0).toFixed(2)}</span>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* TESSERA INFO */}
-      {tesserato?.cod_tessera && (
-        <div className="bg-blue-700 text-white px-6 py-2 text-xs flex gap-6">
-          <span>Tessera: <strong>{tesserato.cod_tessera}</strong></span>
-          {tesserato.categoria && <span>Categoria: <strong>{tesserato.categoria}</strong></span>}
-          {tesserato.data_scadenza_tessera && (
-            <span className={new Date(tesserato.data_scadenza_tessera) < new Date() ? 'text-red-300' : ''}>
-              Scadenza: <strong>{tesserato.data_scadenza_tessera}</strong>
-              {new Date(tesserato.data_scadenza_tessera) < new Date() && ' ⚠️ SCADUTA'}
-            </span>
-          )}
-        </div>
-      )}
+      {/* CONTENUTO */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-lg mx-auto p-4">
 
-      {/* NAVIGAZIONE */}
-      <div className="bg-white border-b flex overflow-x-auto">
-        {SEZIONI.map((s, i) => (
-          <button key={s} onClick={() => setSezione(i)}
-            className={`px-6 py-3 text-sm whitespace-nowrap ${sezione === i ? 'border-b-2 border-blue-700 text-blue-700 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
-            {s}
-          </button>
-        ))}
-      </div>
-
-      <main className="p-6 max-w-2xl mx-auto">
-
-        {/* PROFILO */}
-        {sezione === 0 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-gray-800">Dati personali</h2>
-              {!modifica
-                ? <button onClick={() => setModifica(true)} className="px-3 py-1.5 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Modifica</button>
-                : <div className="flex gap-2">
-                    <button onClick={() => setModifica(false)} className="px-3 py-1.5 text-gray-600 text-sm">Annulla</button>
-                    <button onClick={handleSalva} disabled={salvando} className="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50">
-                      {salvando ? 'Salvo...' : 'Salva'}
-                    </button>
+          {/* HOME */}
+          {sezione === 'home' && (
+            <div className="space-y-4">
+              {/* CARD BENVENUTO */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm">
+                <h2 className="font-bold text-gray-800 text-lg">Ciao {tesserato?.nome}! 👋</h2>
+                <p className="text-gray-500 text-sm mt-1">Ecco il tuo riepilogo di oggi</p>
+                <div className="grid grid-cols-3 gap-3 mt-4">
+                  <div className="text-center p-3 bg-blue-50 rounded-xl">
+                    <p className="text-2xl font-bold text-blue-700">{statistiche?.percentuale ?? 0}%</p>
+                    <p className="text-xs text-gray-500">Presenze</p>
                   </div>
-              }
-            </div>
+                  <div className="text-center p-3 bg-green-50 rounded-xl">
+                    <p className="text-2xl font-bold text-green-700">{statistiche?.streak ?? 0}</p>
+                    <p className="text-xs text-gray-500">Streak 🔥</p>
+                  </div>
+                  <div className="text-center p-3 bg-purple-50 rounded-xl">
+                    <p className="text-2xl font-bold text-purple-700">{compagni.length}</p>
+                    <p className="text-xs text-gray-500">Compagni</p>
+                  </div>
+                </div>
+              </div>
 
-            {/* DATI NON MODIFICABILI */}
-            <div className="bg-gray-50 rounded p-3 mb-4 grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-500 text-xs block">Nome</span><strong>{tesserato?.nome}</strong></div>
-              <div><span className="text-gray-500 text-xs block">Cognome</span><strong>{tesserato?.cognome}</strong></div>
-              <div><span className="text-gray-500 text-xs block">Data di nascita</span><strong>{tesserato?.data_nascita}</strong></div>
-              <div><span className="text-gray-500 text-xs block">Codice Fiscale</span><strong className="font-mono">{tesserato?.codice_fiscale}</strong></div>
-            </div>
+              {/* PROSSIMO EVENTO */}
+              {prossimiEventi.length > 0 && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm">
+                  <h3 className="font-semibold text-gray-700 text-sm mb-3">📅 Prossimo allenamento</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-blue-600 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0">
+                      <p className="text-xs uppercase">{new Date(prossimiEventi[0].data + 'T12:00:00').toLocaleDateString('it-IT', { month: 'short' })}</p>
+                      <p className="text-xl font-bold leading-none">{new Date(prossimiEventi[0].data + 'T12:00:00').getDate()}</p>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-800">{prossimiEventi[0].titolo}</p>
+                      <p className="text-sm text-gray-500">
+                        {prossimiEventi[0].ora_inizio?.substring(0,5)} {prossimiEventi[0].luogo ? `· ${prossimiEventi[0].luogo}` : ''}
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => togglePresenza(prossimiEventi[0].id, true)}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-medium ${getPresenza(prossimiEventi[0].id)?.presente === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+                        >
+                          ✓ Ci sarò
+                        </button>
+                        <button
+                          onClick={() => togglePresenza(prossimiEventi[0].id, false)}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-medium ${getPresenza(prossimiEventi[0].id)?.presente === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+                        >
+                          ✗ Assente
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            {/* DATI MODIFICABILI */}
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Email', key: 'email', type: 'email' },
-                { label: 'Telefono', key: 'telefono' },
-                { label: 'Cellulare', key: 'cellulare' },
-                { label: 'Indirizzo', key: 'indirizzo' },
-                { label: 'Comune', key: 'comune_residenza' },
-                { label: 'Provincia', key: 'provincia_residenza' },
-                { label: 'CAP', key: 'cap_residenza' },
-              ].map(campo => (
-                <div key={campo.key}>
-                  <label className="block text-xs text-gray-500 mb-1">{campo.label}</label>
-                  {modifica
-                    ? <input type={campo.type || 'text'} value={(form as any)[campo.key] || ''}
-                        onChange={f(campo.key)}
-                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    : <p className="text-sm font-medium text-gray-800">{(tesserato as any)?.[campo.key] || '-'}</p>
+              {/* ULTIMO MESSAGGIO */}
+              {messaggi.length > 0 && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm">
+                  <h3 className="font-semibold text-gray-700 text-sm mb-2">📢 Ultimo messaggio</h3>
+                  <p className="font-medium text-gray-800">{messaggi[0].intestazione}</p>
+                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{messaggi[0].corpo}</p>
+                  <p className="text-xs text-gray-400 mt-2">{new Date(messaggi[0].data_invio).toLocaleDateString('it-IT')}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PROFILO */}
+          {sezione === 'profilo' && (
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold text-gray-800">Dati personali</h2>
+                {!modifica
+                  ? <button onClick={() => setModifica(true)} className="px-3 py-1.5 bg-blue-700 text-white rounded-lg text-sm">Modifica</button>
+                  : <div className="flex gap-2">
+                      <button onClick={() => setModifica(false)} className="px-3 py-1.5 text-gray-500 text-sm">Annulla</button>
+                      <button onClick={handleSalva} disabled={salvando} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50">
+                        {salvando ? '...' : 'Salva'}
+                      </button>
+                    </div>
+                }
+              </div>
+              <div className="bg-gray-50 rounded-xl p-4 mb-4 grid grid-cols-2 gap-3 text-sm">
+                {[['Nome', tesserato?.nome], ['Cognome', tesserato?.cognome], ['Data nascita', tesserato?.data_nascita], ['Codice Fiscale', tesserato?.codice_fiscale]].map(([l, v]) => (
+                  <div key={l as string}><span className="text-gray-400 text-xs block">{l}</span><strong className="text-gray-800">{v || '-'}</strong></div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Email', key: 'email', type: 'email' },
+                  { label: 'Telefono', key: 'telefono' },
+                  { label: 'Cellulare', key: 'cellulare' },
+                  { label: 'Indirizzo', key: 'indirizzo' },
+                  { label: 'Comune', key: 'comune_residenza' },
+                  { label: 'Provincia', key: 'provincia_residenza' },
+                  { label: 'CAP', key: 'cap_residenza' },
+                ].map(campo => (
+                  <div key={campo.key}>
+                    <label className="text-xs text-gray-400 block mb-1">{campo.label}</label>
+                    {modifica
+                      ? <input type={campo.type || 'text'} value={(form as any)[campo.key] || ''}
+                          onChange={f(campo.key)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      : <p className="text-sm font-medium text-gray-800">{(tesserato as any)?.[campo.key] || '-'}</p>
+                    }
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TESSERA DIGITALE */}
+          {sezione === 'tessera' && (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-2xl p-6 text-white shadow-lg">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <p className="text-blue-300 text-xs font-medium uppercase tracking-wide">PGS Juvenilia</p>
+                    <p className="text-white font-bold text-xl mt-0.5">{tesserato?.nome} {tesserato?.cognome}</p>
+                  </div>
+                  {tesserato?.foto_url
+                    ? <img src={tesserato.foto_url} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-white/30" />
+                    : <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold">{tesserato?.nome?.[0]}</div>
                   }
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TESSERA */}
-        {sezione === 1 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="font-bold text-gray-800 mb-4">Dati tessera federale</h2>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              {[
-                ['Cod. Tessera', tesserato?.cod_tessera],
-                ['Tipo tessera', tesserato?.tipo_tessera],
-                ['Categoria', tesserato?.categoria],
-                ['Qualifica', tesserato?.qualifica],
-                ['Sport', tesserato?.sport],
-                ['Matricola', tesserato?.matricola],
-                ['Data emissione', tesserato?.data_emissione_tessera],
-                ['Data scadenza', tesserato?.data_scadenza_tessera],
-              ].map(([label, val]) => val ? (
-                <div key={label as string}>
-                  <span className="text-gray-500 text-xs block">{label as string}</span>
-                  <p className={`font-medium ${label === 'Data scadenza' && new Date(val as string) < new Date() ? 'text-red-600' : 'text-gray-800'}`}>
-                    {val as string}
-                    {label === 'Data scadenza' && new Date(val as string) < new Date() && ' ⚠️ SCADUTA'}
-                  </p>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div><p className="text-blue-300 text-xs">Tessera</p><p className="text-white font-mono font-bold">{tesserato?.cod_tessera || '—'}</p></div>
+                  <div><p className="text-blue-300 text-xs">Categoria</p><p className="text-white font-bold">{tesserato?.categoria || '—'}</p></div>
+                  <div><p className="text-blue-300 text-xs">Sport</p><p className="text-white font-bold">{tesserato?.sport || '—'}</p></div>
+                  <div><p className="text-blue-300 text-xs">Scadenza</p>
+                    <p className={`font-bold ${giorniAllaScadenza() !== null && giorniAllaScadenza()! <= 30 ? 'text-red-300' : 'text-white'}`}>
+                      {tesserato?.data_scadenza_tessera || '—'}
+                    </p>
+                  </div>
                 </div>
-              ) : null)}
-            </div>
-          </div>
-        )}
+                <div className="bg-white/10 rounded-xl p-2 text-xs text-blue-200 font-mono">{tesserato?.codice_fiscale}</div>
+              </div>
 
-        {/* DOCUMENTI */}
-        {sezione === 2 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="font-bold text-gray-800 mb-4">I miei documenti</h2>
-            {documenti.length === 0 ? (
-              <p className="text-gray-400 text-sm">Nessun documento caricato</p>
-            ) : (
-              <div className="space-y-2">
-                {documenti.map((d: any) => (
-                  <div key={d.id} className="flex justify-between items-center bg-gray-50 rounded px-3 py-2 text-sm">
-                    <div>
-                      <span className="font-medium">{d.tipo}</span>
-                      <span className="text-gray-500 ml-2 text-xs">{d.nome_file}</span>
-                      {d.data_scadenza && (
-                        <span className={`ml-2 text-xs ${new Date(d.data_scadenza) < new Date() ? 'text-red-500' : 'text-orange-500'}`}>
-                          scad. {d.data_scadenza}
-                          {new Date(d.data_scadenza) < new Date() && ' ⚠️'}
-                        </span>
+              {/* QR CODE */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+                <p className="text-sm font-medium text-gray-700 mb-4">QR Code tessera</p>
+                <div className="flex justify-center">
+                  <QRCodeSVG
+                    value={JSON.stringify({
+                      id: tesserato?.id,
+                      nome: `${tesserato?.nome} ${tesserato?.cognome}`,
+                      cf: tesserato?.codice_fiscale,
+                      tessera: tesserato?.cod_tessera,
+                      categoria: tesserato?.categoria,
+                    })}
+                    size={180}
+                    level="M"
+                    includeMargin
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-3">Mostra questo QR code all'ingresso</p>
+              </div>
+            </div>
+          )}
+
+          {/* ALLENAMENTI */}
+          {sezione === 'allenamenti' && (
+            <div className="space-y-3">
+              <h2 className="font-bold text-gray-800">📅 Allenamenti ed eventi</h2>
+              {eventi.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                  <p className="text-gray-300 text-4xl mb-2">📭</p>
+                  <p className="text-gray-400 text-sm">Nessun evento in programma</p>
+                </div>
+              ) : (
+                eventi.map(e => {
+                  const presenza = getPresenza(e.id);
+                  const futuro = e.data >= oggi;
+                  return (
+                    <div key={e.id} className={`bg-white rounded-2xl p-4 shadow-sm border-l-4 ${
+                      presenza?.presente === true ? 'border-green-400' :
+                      presenza?.presente === false ? 'border-red-400' : 'border-gray-200'
+                    }`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-semibold text-gray-800">{e.titolo}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(e.data + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                            {e.ora_inizio && ` · ${e.ora_inizio.substring(0,5)}`}
+                            {e.luogo && ` · ${e.luogo}`}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${TIPO_COLORE[e.tipo] || 'bg-gray-100 text-gray-600'}`}>{e.tipo}</span>
+                      </div>
+                      {futuro && (
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={() => togglePresenza(e.id, true)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-semibold ${presenza?.presente === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-green-50'}`}>
+                            ✓ Ci sarò
+                          </button>
+                          <button onClick={() => togglePresenza(e.id, false)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-semibold ${presenza?.presente === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-red-50'}`}>
+                            ✗ Non ci sarò
+                          </button>
+                        </div>
+                      )}
+                      {!futuro && presenza && (
+                        <div className={`mt-2 text-xs font-medium ${presenza.presente ? 'text-green-600' : 'text-red-500'}`}>
+                          {presenza.presente ? '✓ Presente' : '✗ Assente'}
+                        </div>
                       )}
                     </div>
-                    <a href={d.url} target="_blank" rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 text-xs">
-                      {d.nome_file.toLowerCase().endsWith('.pdf') ? '📄 Apri' : '🖼 Apri'}
-                    </a>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                  );
+                })
+              )}
+            </div>
+          )}
 
-        {/* ALLENAMENTI */}
-        {sezione === 3 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="font-bold text-gray-800 mb-4">Prossimi eventi e allenamenti</h2>
-            {eventi.length === 0 ? (
-              <p className="text-gray-400 text-sm">Nessun evento programmato</p>
-            ) : (
-              <div className="space-y-3">
-                {[...eventi].sort((a, b) => a.data.localeCompare(b.data)).map(e => (
-                  <div key={e.id} className="border border-gray-100 rounded p-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-gray-800">{e.titolo}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {new Date(e.data + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
-                          {e.ora_inizio && ` · ${e.ora_inizio.substring(0,5)}`}
-                          {e.ora_fine && ` - ${e.ora_fine.substring(0,5)}`}
-                          {e.luogo && ` · ${e.luogo}`}
-                        </p>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded text-white ${
-                        e.tipo === 'allenamento' ? 'bg-blue-500' :
-                        e.tipo === 'partita' ? 'bg-red-500' :
-                        e.tipo === 'raduno' ? 'bg-green-500' : 'bg-gray-500'
-                      }`}>{e.tipo}</span>
-                    </div>
+          {/* STATISTICHE */}
+          {sezione === 'statistiche' && statistiche && (
+            <div className="space-y-4">
+              <h2 className="font-bold text-gray-800">📊 Le mie statistiche</h2>
+              
+              {/* PERCENTUALE CIRCOLARE */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+                <div className="relative w-36 h-36 mx-auto mb-4">
+                  <svg className="w-36 h-36 transform -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="#e5e7eb" strokeWidth="12" />
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="#3b82f6" strokeWidth="12"
+                      strokeDasharray={`${2 * Math.PI * 54 * statistiche.percentuale / 100} ${2 * Math.PI * 54}`}
+                      strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <p className="text-3xl font-bold text-gray-800">{statistiche.percentuale}%</p>
+                    <p className="text-xs text-gray-400">presenze</p>
                   </div>
-                ))}
+                </div>
+                <p className="text-sm text-gray-500">Su {statistiche.totale_eventi} eventi totali</p>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* MESSAGGI */}
-        {sezione === 4 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="font-bold text-gray-800 mb-4">Messaggi ricevuti</h2>
-            {messaggi.length === 0 ? (
-              <p className="text-gray-400 text-sm">Nessun messaggio ricevuto</p>
-            ) : (
-              <div className="space-y-3">
-                {messaggi.map(m => (
-                  <div key={m.id} className="border border-gray-100 rounded p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-gray-800">{m.intestazione}</h3>
-                      <span className="text-xs text-gray-400">{new Date(m.data_invio).toLocaleDateString('it-IT')}</span>
-                    </div>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{m.corpo}</p>
-                  </div>
-                ))}
+              {/* CARDS STATS */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-green-50 rounded-2xl p-4 text-center">
+                  <p className="text-3xl font-bold text-green-600">{statistiche.presenze}</p>
+                  <p className="text-xs text-gray-500 mt-1">Presenze</p>
+                </div>
+                <div className="bg-red-50 rounded-2xl p-4 text-center">
+                  <p className="text-3xl font-bold text-red-500">{statistiche.assenze}</p>
+                  <p className="text-xs text-gray-500 mt-1">Assenze</p>
+                </div>
+                <div className="bg-orange-50 rounded-2xl p-4 text-center col-span-2">
+                  <p className="text-3xl font-bold text-orange-500">🔥 {statistiche.streak}</p>
+                  <p className="text-xs text-gray-500 mt-1">Allenamenti consecutivi</p>
+                </div>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* PAGAMENTI */}
-        {sezione === 5 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="font-bold text-gray-800 mb-4">I miei pagamenti</h2>
-            {pagamenti.length === 0 ? (
-              <p className="text-gray-400 text-sm">Nessun pagamento registrato</p>
-            ) : (
-              <div className="space-y-2">
-                {pagamenti.map(p => (
-                  <div key={p.id} className={`flex justify-between items-center p-3 rounded border ${
-                    p.pagato ? 'border-green-100 bg-green-50' : new Date(p.data_scadenza) < new Date() ? 'border-red-100 bg-red-50' : 'border-gray-100'
-                  }`}>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">€ {p.importo.toFixed(2)}</p>
-                      <p className="text-xs text-gray-500">Scadenza: {p.data_scadenza}</p>
+              {/* MESSAGGIO MOTIVAZIONALE */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-5 text-white text-center">
+                <p className="text-2xl mb-2">
+                  {statistiche.percentuale >= 80 ? '🏆' : statistiche.percentuale >= 60 ? '💪' : '📈'}
+                </p>
+                <p className="font-bold">
+                  {statistiche.percentuale >= 80 ? 'Eccellente! Sei un pilastro della squadra!' :
+                   statistiche.percentuale >= 60 ? 'Buona continuità! Continua così!' :
+                   'Ogni allenamento conta. Vieni più spesso!'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* COMPAGNI */}
+          {sezione === 'compagni' && (
+            <div className="space-y-4">
+              <h2 className="font-bold text-gray-800">👥 I miei compagni ({compagni.length})</h2>
+              {compagni.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                  <p className="text-gray-300 text-4xl mb-2">👤</p>
+                  <p className="text-gray-400 text-sm">Nessun compagno di gruppo trovato</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {compagni.map(c => (
+                    <div key={c.id} className="bg-white rounded-2xl p-4 shadow-sm text-center">
+                      {c.foto_url
+                        ? <img src={c.foto_url} alt="" className="w-16 h-16 rounded-full object-cover mx-auto mb-2 border-2 border-gray-100" />
+                        : <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xl font-bold mx-auto mb-2">
+                            {c.nome[0]}{c.cognome[0]}
+                          </div>
+                      }
+                      <p className="font-semibold text-gray-800 text-sm">{c.nome}</p>
+                      <p className="font-semibold text-gray-800 text-sm">{c.cognome}</p>
+                      {c.categoria && <p className="text-xs text-gray-400 mt-0.5">{c.categoria}</p>}
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded font-medium ${
-                      p.pagato ? 'bg-green-100 text-green-700' : new Date(p.data_scadenza) < new Date() ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DOCUMENTI */}
+          {sezione === 'documenti' && (
+            <div className="space-y-3">
+              <h2 className="font-bold text-gray-800">📁 I miei documenti</h2>
+              {documenti.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                  <p className="text-gray-300 text-4xl mb-2">📂</p>
+                  <p className="text-gray-400 text-sm">Nessun documento caricato</p>
+                </div>
+              ) : (
+                documenti.map(d => {
+                  const scad = d.data_scadenza ? Math.ceil((new Date(d.data_scadenza).getTime() - new Date().getTime()) / 86400000) : null;
+                  return (
+                    <div key={d.id} className={`bg-white rounded-2xl p-4 shadow-sm border-l-4 ${
+                      scad !== null && scad <= 0 ? 'border-red-400' :
+                      scad !== null && scad <= 30 ? 'border-yellow-400' : 'border-gray-200'
                     }`}>
-                      {p.pagato ? '✓ Pagato' : new Date(p.data_scadenza) < new Date() ? 'Scaduto' : 'Da pagare'}
-                    </span>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold text-gray-800">{d.tipo}</p>
+                          <p className="text-xs text-gray-400">{d.nome_file}</p>
+                          {d.data_scadenza && (
+                            <p className={`text-xs mt-1 ${scad !== null && scad <= 0 ? 'text-red-500 font-medium' : scad !== null && scad <= 30 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                              {scad !== null && scad <= 0 ? '⚠️ Scaduto' : `Scade: ${d.data_scadenza}`}
+                            </p>
+                          )}
+                        </div>
+                        <a href={d.url} target="_blank" rel="noopener noreferrer"
+                          className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium">
+                          {d.nome_file.toLowerCase().endsWith('.pdf') ? '📄 Apri' : '🖼 Apri'}
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* MESSAGGI */}
+          {sezione === 'messaggi' && (
+            <div className="space-y-3">
+              <h2 className="font-bold text-gray-800">📢 Comunicazioni ({messaggi.length})</h2>
+              {messaggi.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                  <p className="text-gray-300 text-4xl mb-2">📭</p>
+                  <p className="text-gray-400 text-sm">Nessun messaggio ricevuto</p>
+                </div>
+              ) : (
+                messaggi.map(m => (
+                  <div key={m.id} className="bg-white rounded-2xl p-5 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-gray-800 flex-1 pr-2">{m.intestazione}</h3>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{new Date(m.data_invio).toLocaleDateString('it-IT')}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{m.corpo}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </main>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* PAGAMENTI */}
+          {sezione === 'pagamenti' && (
+            <div className="space-y-3">
+              <h2 className="font-bold text-gray-800">💳 I miei pagamenti</h2>
+              {pagamenti.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                  <p className="text-gray-300 text-4xl mb-2">✅</p>
+                  <p className="text-gray-400 text-sm">Nessun pagamento registrato</p>
+                </div>
+              ) : (
+                <>
+                  {pagamenti.filter(p => !p.pagato).length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                      <p className="text-sm font-bold text-red-700 mb-2">Da pagare</p>
+                      {pagamenti.filter(p => !p.pagato).map(p => (
+                        <div key={p.id} className="flex justify-between items-center py-2 border-b border-red-100 last:border-0">
+                          <p className="text-sm text-gray-700">Scad. {p.data_scadenza}</p>
+                          <p className="font-bold text-red-600">€ {p.importo.toFixed(2)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {pagamenti.filter(p => p.pagato).length > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                      <p className="text-sm font-bold text-green-700 mb-2">Pagati</p>
+                      {pagamenti.filter(p => p.pagato).map(p => (
+                        <div key={p.id} className="flex justify-between items-center py-2 border-b border-green-100 last:border-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-500">✓</span>
+                            <p className="text-sm text-gray-700">€ {p.importo.toFixed(2)}</p>
+                          </div>
+                          <p className="text-xs text-gray-400">{p.data_scadenza}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* BOTTOM NAV */}
+      <nav className="bg-white border-t border-gray-200 px-2 py-2 flex-shrink-0">
+        <div className="max-w-lg mx-auto flex justify-around">
+          {SEZIONI.map(s => (
+            <button key={s.id} onClick={() => setSezione(s.id)}
+              className={`flex flex-col items-center px-2 py-1.5 rounded-xl transition ${
+                sezione === s.id ? 'bg-blue-50 text-blue-700' : 'text-gray-400 hover:text-gray-600'
+              }`}>
+              <span className="text-xl">{s.label}</span>
+              <span className="text-[10px] mt-0.5 font-medium">{s.titolo}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 };

@@ -132,3 +132,8 @@ export const riattivaTesserato = (id: number) => api.put(`/tesserati/${id}/riatt
 export const getVapidPublicKey = () => api.get('/push/vapid-public-key');
 export const subscribePush = (data: any) => api.post('/push/subscribe', data);
 export const unsubscribePush = (endpoint: string) => api.delete(`/push/unsubscribe?endpoint=${encodeURIComponent(endpoint)}`);
+
+export const getCompagniGruppo = (tesseratoId: number) => api.get(`/tesserati/${tesseratoId}/compagni`);
+export const getStatisticheTesserato = (tesseratoId: number) => api.get(`/tesserati/${tesseratoId}/statistiche`);
+export const getPresenzeTesserato = (tesseratoId: number) => api.get(`/tesserati/${tesseratoId}/presenze`);
+export const aggiornaPresenza = (presenzaId: number, data: any) => api.put(`/presenze/${presenzaId}`, data);
