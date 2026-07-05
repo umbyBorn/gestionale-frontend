@@ -125,17 +125,7 @@ const Messaggi: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-800 text-white px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <a href="/" className="text-white hover:text-blue-200 text-sm">← Dashboard</a>
-          <h1 className="text-xl font-bold">Messaggio Broadcast</h1>
-        </div>
-        <button onClick={apriStorico} className="bg-white text-blue-800 px-4 py-1 rounded font-medium text-sm hover:bg-blue-50">
-          Storico messaggi
-        </button>
-      </header>
-
+    <div className="bg-gray-100 min-h-full">
       <main className="p-6 max-w-3xl mx-auto">
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">1. Seleziona uno o più gruppi</h2>

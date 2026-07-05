@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getTesserati, getGruppi, getPagamentiScaduti, getStaff } from '../services/api';
 
 const Dashboard: React.FC = () => {
   const { utente, logout, hasPermesso, ruolo } = useAuth();
-  const { iscritto, attivaPush } = usePushNotifications(utente?.id);
+
   const [stats, setStats] = useState({ tesserati: 0, gruppi: 0, pagamentiScaduti: 0, staff: 0 });
 
   useEffect(() => {
@@ -27,25 +26,8 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-800 text-white px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">Gestionale Sportivo</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm">{utente?.email}</span>
-          {ruolo === 'amministratore' && (
-            <a href="/admin" className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">Utenti</a>
-          )}
-          {!iscritto && (
-            <button onClick={attivaPush} className="bg-yellow-500 hover:bg-yellow-400 px-3 py-1 rounded text-sm text-white">
-              🔔 Attiva notifiche
-            </button>
-          )}
-          {iscritto && <span className="text-xs text-blue-200">🔔 Notifiche attive</span>}
-          <button onClick={logout} className="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">Esci</button>
-        </div>
-      </header>
-      <main className="p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Dashboard</h2>
+    <div className="bg-gray-100 min-h-full">
+      <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow p-4">
             <p className="text-sm text-gray-500">Tesserati attivi</p>
@@ -72,7 +54,7 @@ const Dashboard: React.FC = () => {
             </a>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 };

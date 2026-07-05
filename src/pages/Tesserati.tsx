@@ -245,17 +245,7 @@ Sei sicuro?`)) {
   const anniDisponibili = Array.from(new Set(tesserati.map(t => t.data_nascita?.substring(0,4)).filter((a): a is string => !!a))).sort();
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-800 text-white px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <a href="/" className="text-white hover:text-blue-200 text-sm">← Dashboard</a>
-          <h1 className="text-xl font-bold">Tesserati</h1>
-        </div>
-        <button onClick={apriNuovo} className="bg-white text-blue-800 px-4 py-1 rounded font-medium text-sm hover:bg-blue-50">
-          + Nuovo tesserato
-        </button>
-      </header>
-
+    <div className="bg-gray-100 min-h-full">
       <main className="p-6">
         <input type="text" placeholder="Cerca per nome, cognome o CF..."
           value={ricerca} onChange={e => setRicerca(e.target.value)}

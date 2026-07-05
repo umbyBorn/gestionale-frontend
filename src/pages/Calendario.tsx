@@ -113,17 +113,7 @@ const Calendario: React.FC = () => {
   const formatData = (g: number) => `${anno}-${String(mese).padStart(2, '0')}-${String(g).padStart(2, '0')}`;
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-800 text-white px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <a href="/" className="text-white hover:text-blue-200 text-sm">← Dashboard</a>
-          <h1 className="text-xl font-bold">Calendario</h1>
-        </div>
-        <button onClick={() => setMostraFormRicorrente(true)} className="bg-white text-blue-800 px-4 py-1 rounded font-medium text-sm hover:bg-blue-50">
-          + Evento ricorrente
-        </button>
-      </header>
-
+    <div className="bg-gray-100 min-h-full">
       <main className="p-4">
         {/* Navigazione mese */}
         <div className="flex items-center justify-between mb-4 bg-white rounded-lg shadow px-4 py-3">

@@ -90,21 +90,7 @@ const Pagamenti: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-800 text-white px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <a href="/" className="text-white hover:text-blue-200 text-sm">← Dashboard</a>
-          <h1 className="text-xl font-bold">Pagamenti</h1>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setMostraFormTariffa(true)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-500">
-            + Tariffa
-          </button>
-          <button onClick={() => setMostraFormPagamento(true)} className="bg-white text-blue-800 px-3 py-1 rounded text-sm hover:bg-blue-50">
-            + Pagamento
-          </button>
-        </div>
-      </header>
+    <div className="bg-gray-100 min-h-full">
       <main className="p-6">
         <div className="flex gap-2 mb-6">
           {(['tutti', 'scaduti', 'pagati'] as const).map((f) => (

@@ -42,16 +42,7 @@ const Assemblee: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-800 text-white px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <a href="/" className="text-white hover:text-blue-200 text-sm">← Dashboard</a>
-          <h1 className="text-xl font-bold">Assemblee</h1>
-        </div>
-        <button onClick={() => setMostraForm(true)} className="bg-white text-blue-800 px-4 py-1 rounded font-medium text-sm hover:bg-blue-50">
-          + Nuova assemblea
-        </button>
-      </header>
+    <div className="bg-gray-100 min-h-full">
       <main className="p-6">
         {loading ? <p className="text-gray-500">Caricamento...</p> : (
           <div className="space-y-4">

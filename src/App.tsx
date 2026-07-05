@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Tesserati from './pages/Tesserati';
@@ -14,27 +15,22 @@ import Messaggi from './pages/Messaggi';
 import Admin from './pages/Admin';
 import PortaleTesserato from './pages/PortaleTesserato';
 
-const RequireLogin: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { utente, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
-  if (!utente) return <Navigate to="/login" />;
-  return <>{children}</>;
-};
-
-const ProtectedRoute: React.FC<{ children: React.ReactNode; sezione?: string }> = ({ children, sezione }) => {
-  const { utente, loading, hasPermesso, ruolo } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
+const RouteGuard: React.FC<{ children: React.ReactNode; titolo?: string; sezione?: string; soloAdmin?: boolean }> = ({
+  children, titolo, sezione, soloAdmin
+}) => {
+  const { utente, loading, ruolo, hasPermesso } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Caricamento...</div>;
   if (!utente) return <Navigate to="/login" />;
   if (ruolo === 'tesserato') return <Navigate to="/portale" />;
+  if (soloAdmin && ruolo !== 'amministratore') return <Navigate to="/" />;
   if (sezione && !hasPermesso(sezione)) return <Navigate to="/" />;
-  return <>{children}</>;
+  return <Layout titolo={titolo}>{children}</Layout>;
 };
 
-const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { utente, loading, ruolo } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
+const RequireLogin: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { utente, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Caricamento...</div>;
   if (!utente) return <Navigate to="/login" />;
-  if (ruolo !== 'amministratore') return <Navigate to="/" />;
   return <>{children}</>;
 };
 
@@ -44,17 +40,17 @@ const App: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/tesserati" element={<ProtectedRoute sezione="tesserati"><Tesserati /></ProtectedRoute>} />
-          <Route path="/gruppi" element={<ProtectedRoute sezione="gruppi"><Gruppi /></ProtectedRoute>} />
-          <Route path="/pagamenti" element={<ProtectedRoute sezione="pagamenti"><Pagamenti /></ProtectedRoute>} />
-          <Route path="/staff" element={<ProtectedRoute sezione="staff"><Staff /></ProtectedRoute>} />
-          <Route path="/presenze" element={<ProtectedRoute sezione="presenze"><Presenze /></ProtectedRoute>} />
-          <Route path="/assemblee" element={<ProtectedRoute sezione="assemblee"><Assemblee /></ProtectedRoute>} />
-          <Route path="/calendario" element={<ProtectedRoute sezione="calendario"><Calendario /></ProtectedRoute>} />
-          <Route path="/messaggi" element={<ProtectedRoute sezione="messaggi"><Messaggi /></ProtectedRoute>} />
-          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/portale" element={<RequireLogin><PortaleTesserato /></RequireLogin>} />
+          <Route path="/" element={<RouteGuard titolo="Dashboard"><Dashboard /></RouteGuard>} />
+          <Route path="/tesserati" element={<RouteGuard titolo="Tesserati" sezione="tesserati"><Tesserati /></RouteGuard>} />
+          <Route path="/gruppi" element={<RouteGuard titolo="Gruppi" sezione="gruppi"><Gruppi /></RouteGuard>} />
+          <Route path="/pagamenti" element={<RouteGuard titolo="Pagamenti" sezione="pagamenti"><Pagamenti /></RouteGuard>} />
+          <Route path="/staff" element={<RouteGuard titolo="Staff" sezione="staff"><Staff /></RouteGuard>} />
+          <Route path="/presenze" element={<RouteGuard titolo="Presenze" sezione="presenze"><Presenze /></RouteGuard>} />
+          <Route path="/assemblee" element={<RouteGuard titolo="Assemblee" sezione="assemblee"><Assemblee /></RouteGuard>} />
+          <Route path="/calendario" element={<RouteGuard titolo="Calendario" sezione="calendario"><Calendario /></RouteGuard>} />
+          <Route path="/messaggi" element={<RouteGuard titolo="Messaggi" sezione="messaggi"><Messaggi /></RouteGuard>} />
+          <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
