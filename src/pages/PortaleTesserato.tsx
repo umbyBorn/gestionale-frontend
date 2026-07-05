@@ -61,6 +61,11 @@ const PortaleTesserato: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
 
   const oggi = new Date().toISOString().split('T')[0];
+  const [calAnno, setCalAnno] = useState(new Date().getFullYear());
+  const [calMese, setCalMese] = useState(new Date().getMonth());
+  const [giornoSelezionato, setGiornoSelezionato] = useState<string | null>(null);
+  const [msgAnno, setMsgAnno] = useState(new Date().getFullYear());
+  const [msgMese, setMsgMese] = useState(new Date().getMonth());
 
   useEffect(() => {
     if (!tesseratoId) { setLoading(false); return; }
@@ -150,7 +155,7 @@ const PortaleTesserato: React.FC = () => {
   const pagamentiDaPagare = pagamenti.filter(p => !p.pagato);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* HEADER */}
       <header className="bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">
@@ -368,58 +373,146 @@ const PortaleTesserato: React.FC = () => {
             </div>
           )}
 
-          {/* ALLENAMENTI */}
-          {sezione === 'allenamenti' && (
-            <div className="space-y-3">
-              <h2 className="font-bold text-gray-800">📅 Allenamenti ed eventi</h2>
-              {eventi.length === 0 ? (
-                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-                  <p className="text-gray-300 text-4xl mb-2">📭</p>
-                  <p className="text-gray-400 text-sm">Nessun evento in programma</p>
+          {/* ALLENAMENTI — CALENDARIO */}
+          {sezione === 'allenamenti' && (() => {
+            const MESI_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+            const GIORNI_IT = ['D','L','M','M','G','V','S'];
+            const primoGiorno = new Date(calAnno, calMese, 1).getDay();
+            const giorniNelMese = new Date(calAnno, calMese + 1, 0).getDate();
+            const eventiDelGiorno = (g: number) => {
+              const dataStr = `${calAnno}-${String(calMese+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+              return eventi.filter(e => e.data === dataStr);
+            };
+            const eventiSelezionati = giornoSelezionato ? eventi.filter(e => e.data === giornoSelezionato) : [];
+            return (
+              <div className="space-y-4">
+                {/* HEADER MESE */}
+                <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-4 text-white">
+                  <div className="flex justify-between items-center mb-4">
+                    <button onClick={() => { if(calMese===0){setCalMese(11);setCalAnno(y=>y-1);}else setCalMese(m=>m-1); setGiornoSelezionato(null); }}
+                      className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30">◀</button>
+                    <h3 className="font-bold text-lg">{MESI_IT[calMese]} {calAnno}</h3>
+                    <button onClick={() => { if(calMese===11){setCalMese(0);setCalAnno(y=>y+1);}else setCalMese(m=>m+1); setGiornoSelezionato(null); }}
+                      className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30">▶</button>
+                  </div>
+                  {/* INTESTAZIONI GIORNI */}
+                  <div className="grid grid-cols-7 mb-2">
+                    {GIORNI_IT.map((g,i) => <div key={i} className="text-center text-xs text-blue-200 font-medium py-1">{g}</div>)}
+                  </div>
+                  {/* GRIGLIA GIORNI */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({length: primoGiorno}).map((_,i) => <div key={`e${i}`} />)}
+                    {Array.from({length: giorniNelMese}).map((_,i) => {
+                      const g = i+1;
+                      const dataStr = `${calAnno}-${String(calMese+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+                      const evGiorno = eventiDelGiorno(g);
+                      const isOggi = dataStr === oggi;
+                      const isSel = dataStr === giornoSelezionato;
+                      const haEventi = evGiorno.length > 0;
+                      return (
+                        <button key={g} onClick={() => setGiornoSelezionato(isSel ? null : dataStr)}
+                          className={`aspect-square rounded-xl flex flex-col items-center justify-center transition ${
+                            isSel ? 'bg-white text-blue-700 shadow-lg scale-110' :
+                            isOggi ? 'bg-white/30 text-white font-bold' :
+                            haEventi ? 'bg-white/10 text-white hover:bg-white/20' :
+                            'text-blue-100 hover:bg-white/10'
+                          }`}>
+                          <span className="text-sm font-semibold">{g}</span>
+                          {haEventi && <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSel ? 'bg-blue-600' : 'bg-yellow-300'}`} />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : (
-                eventi.map(e => {
-                  const presenza = getPresenza(e.id);
-                  const futuro = e.data >= oggi;
-                  return (
-                    <div key={e.id} className={`bg-white rounded-2xl p-4 shadow-sm border-l-4 ${
-                      presenza?.presente === true ? 'border-green-400' :
-                      presenza?.presente === false ? 'border-red-400' : 'border-gray-200'
-                    }`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-semibold text-gray-800">{e.titolo}</p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(e.data + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
-                            {e.ora_inizio && ` · ${e.ora_inizio.substring(0,5)}`}
-                            {e.luogo && ` · ${e.luogo}`}
-                          </p>
-                        </div>
-                        <span className={`text-xs px-2 py-1 rounded-full ${TIPO_COLORE[e.tipo] || 'bg-gray-100 text-gray-600'}`}>{e.tipo}</span>
+
+                {/* EVENTI DEL GIORNO SELEZIONATO */}
+                {giornoSelezionato && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-gray-700 text-sm">
+                      {new Date(giornoSelezionato + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </h3>
+                    {eventiSelezionati.length === 0 ? (
+                      <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
+                        <p className="text-gray-300 text-3xl mb-1">📭</p>
+                        <p className="text-gray-400 text-sm">Nessun evento questo giorno</p>
                       </div>
-                      {futuro && (
-                        <div className="flex gap-2 mt-3">
-                          <button onClick={() => togglePresenza(e.id, true)}
-                            className={`flex-1 py-2 rounded-xl text-xs font-semibold ${presenza?.presente === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-green-50'}`}>
-                            ✓ Ci sarò
-                          </button>
-                          <button onClick={() => togglePresenza(e.id, false)}
-                            className={`flex-1 py-2 rounded-xl text-xs font-semibold ${presenza?.presente === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-red-50'}`}>
-                            ✗ Non ci sarò
-                          </button>
-                        </div>
-                      )}
-                      {!futuro && presenza && (
-                        <div className={`mt-2 text-xs font-medium ${presenza.presente ? 'text-green-600' : 'text-red-500'}`}>
-                          {presenza.presente ? '✓ Presente' : '✗ Assente'}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
+                    ) : (
+                      eventiSelezionati.map(e => {
+                        const presenza = getPresenza(e.id);
+                        const futuro = e.data >= oggi;
+                        return (
+                          <div key={e.id} className={`bg-white rounded-2xl p-4 shadow-sm border-l-4 ${
+                            presenza?.presente === true ? 'border-green-400' :
+                            presenza?.presente === false ? 'border-red-400' : 'border-blue-300'}`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-bold text-gray-800">{e.titolo}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {e.ora_inizio?.substring(0,5)}{e.ora_fine ? ` - ${e.ora_fine.substring(0,5)}` : ''}
+                                  {e.luogo ? ` · ${e.luogo}` : ''}
+                                </p>
+                              </div>
+                              <span className={`text-xs px-2 py-1 rounded-full ${TIPO_COLORE[e.tipo] || 'bg-gray-100 text-gray-600'}`}>{e.tipo}</span>
+                            </div>
+                            {futuro && (
+                              <div className="flex gap-2 mt-3">
+                                <button onClick={() => togglePresenza(e.id, true)}
+                                  className={`flex-1 py-2 rounded-xl text-xs font-bold ${presenza?.presente === true ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-green-50 hover:text-green-600'}`}>
+                                  ✓ Ci sarò
+                                </button>
+                                <button onClick={() => togglePresenza(e.id, false)}
+                                  className={`flex-1 py-2 rounded-xl text-xs font-bold ${presenza?.presente === false ? 'bg-red-500 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600'}`}>
+                                  ✗ Non ci sarò
+                                </button>
+                              </div>
+                            )}
+                            {!futuro && presenza && (
+                              <div className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold inline-block ${presenza.presente ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                                {presenza.presente ? '✓ Eri presente' : '✗ Eri assente'}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* PROSSIMI EVENTI (se nessun giorno selezionato) */}
+                {!giornoSelezionato && (
+                  <div>
+                    <h3 className="font-semibold text-gray-700 text-sm mb-3">Prossimi eventi</h3>
+                    {eventi.filter(e => e.data >= oggi).slice(0,3).length === 0 ? (
+                      <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
+                        <p className="text-gray-300 text-3xl mb-1">📭</p>
+                        <p className="text-gray-400 text-sm">Nessun evento in programma</p>
+                      </div>
+                    ) : (
+                      eventi.filter(e => e.data >= oggi).slice(0,3).map(e => {
+                        const presenza = getPresenza(e.id);
+                        return (
+                          <div key={e.id} onClick={() => setGiornoSelezionato(e.data)}
+                            className="bg-white rounded-2xl p-4 shadow-sm mb-2 flex items-center gap-3 cursor-pointer hover:shadow-md transition">
+                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0">
+                              <p className="text-xs leading-none">{new Date(e.data+'T12:00:00').toLocaleDateString('it-IT',{month:'short'}).toUpperCase()}</p>
+                              <p className="text-lg font-bold leading-none">{new Date(e.data+'T12:00:00').getDate()}</p>
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-800 text-sm">{e.titolo}</p>
+                              <p className="text-xs text-gray-400">{e.ora_inizio?.substring(0,5)} {e.luogo ? `· ${e.luogo}` : ''}</p>
+                            </div>
+                            {presenza?.presente === true && <span className="text-green-500 text-lg">✓</span>}
+                            {presenza?.presente === false && <span className="text-red-500 text-lg">✗</span>}
+                            {!presenza && <span className="text-gray-300 text-lg">○</span>}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* STATISTICHE */}
           {sezione === 'statistiche' && statistiche && (
@@ -541,28 +634,104 @@ const PortaleTesserato: React.FC = () => {
             </div>
           )}
 
-          {/* MESSAGGI */}
-          {sezione === 'messaggi' && (
-            <div className="space-y-3">
-              <h2 className="font-bold text-gray-800">📢 Comunicazioni ({messaggi.length})</h2>
-              {messaggi.length === 0 ? (
-                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-                  <p className="text-gray-300 text-4xl mb-2">📭</p>
-                  <p className="text-gray-400 text-sm">Nessun messaggio ricevuto</p>
-                </div>
-              ) : (
-                messaggi.map(m => (
-                  <div key={m.id} className="bg-white rounded-2xl p-5 shadow-sm">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-gray-800 flex-1 pr-2">{m.intestazione}</h3>
-                      <span className="text-xs text-gray-400 flex-shrink-0">{new Date(m.data_invio).toLocaleDateString('it-IT')}</span>
+          {/* MESSAGGI — CALENDARIO */}
+          {sezione === 'messaggi' && (() => {
+            const MESI_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+            const GIORNI_IT = ['D','L','M','M','G','V','S'];
+            const primoGiorno = new Date(msgAnno, msgMese, 1).getDay();
+            const giorniNelMese = new Date(msgAnno, msgMese + 1, 0).getDate();
+            const [msgSelezionato, setMsgSelezionato] = React.useState<number | null>(null);
+            const msgDelGiorno = (g: number) => {
+              const dataStr = `${msgAnno}-${String(msgMese+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+              return messaggi.filter(m => m.data_invio.startsWith(dataStr));
+            };
+            const msgMeseCorrente = messaggi.filter(m => {
+              const d = new Date(m.data_invio);
+              return d.getFullYear() === msgAnno && d.getMonth() === msgMese;
+            });
+            return (
+              <div className="space-y-4">
+                {/* HEADER MESE */}
+                <div className="bg-gradient-to-r from-purple-600 to-purple-800 rounded-2xl p-4 text-white">
+                  <div className="flex justify-between items-center mb-4">
+                    <button onClick={() => { if(msgMese===0){setMsgMese(11);setMsgAnno(y=>y-1);}else setMsgMese(m=>m-1); }}
+                      className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30">◀</button>
+                    <div className="text-center">
+                      <h3 className="font-bold text-lg">{MESI_IT[msgMese]} {msgAnno}</h3>
+                      <p className="text-xs text-purple-200">{msgMeseCorrente.length} messaggi ricevuti</p>
                     </div>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{m.corpo}</p>
+                    <button onClick={() => { if(msgMese===11){setMsgMese(0);setMsgAnno(y=>y+1);}else setMsgMese(m=>m+1); }}
+                      className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30">▶</button>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                  <div className="grid grid-cols-7 mb-2">
+                    {GIORNI_IT.map((g,i) => <div key={i} className="text-center text-xs text-purple-200 font-medium py-1">{g}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({length: primoGiorno}).map((_,i) => <div key={`e${i}`} />)}
+                    {Array.from({length: giorniNelMese}).map((_,i) => {
+                      const g = i+1;
+                      const haMsg = msgDelGiorno(g).length > 0;
+                      const dataStr = `${msgAnno}-${String(msgMese+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+                      const isOggi = dataStr === oggi;
+                      return (
+                        <div key={g} className={`aspect-square rounded-xl flex flex-col items-center justify-center transition ${
+                          haMsg ? 'bg-white/20 cursor-pointer hover:bg-white/30' :
+                          isOggi ? 'bg-white/10' : ''}`}>
+                          <span className={`text-sm ${haMsg ? 'font-bold text-white' : isOggi ? 'font-bold text-white' : 'text-purple-200'}`}>{g}</span>
+                          {haMsg && <span className="w-1.5 h-1.5 rounded-full bg-yellow-300 mt-0.5" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* LISTA MESSAGGI DEL MESE */}
+                {msgMeseCorrente.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                    <p className="text-gray-300 text-4xl mb-2">📭</p>
+                    <p className="text-gray-400 text-sm">Nessun messaggio in {MESI_IT[msgMese]}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-gray-700 text-sm">Messaggi di {MESI_IT[msgMese]}</h3>
+                    {msgMeseCorrente.map(m => (
+                      <div key={m.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                        <button
+                          onClick={() => setMsgSelezionato(msgSelezionato === m.id ? null : m.id)}
+                          className="w-full p-4 text-left">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-start gap-3 flex-1">
+                              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <span className="text-purple-600 text-lg">📢</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-gray-800 text-sm">{m.intestazione}</p>
+                                {msgSelezionato !== m.id && (
+                                  <p className="text-xs text-gray-400 mt-0.5 truncate">{m.corpo}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end ml-2 flex-shrink-0">
+                              <span className="text-xs text-gray-400">{new Date(m.data_invio).toLocaleDateString('it-IT', {day:'numeric', month:'short'})}</span>
+                              <span className="text-gray-300 text-xs mt-1">{msgSelezionato === m.id ? '▲' : '▼'}</span>
+                            </div>
+                          </div>
+                        </button>
+                        {msgSelezionato === m.id && (
+                          <div className="px-4 pb-4 border-t border-gray-50">
+                            <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed pt-3">{m.corpo}</p>
+                            <p className="text-xs text-gray-300 mt-3">
+                              {new Date(m.data_invio).toLocaleString('it-IT')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* PAGAMENTI */}
           {sezione === 'pagamenti' && (
