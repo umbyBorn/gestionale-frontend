@@ -14,6 +14,8 @@ import Calendario from './pages/Calendario';
 import Messaggi from './pages/Messaggi';
 import Admin from './pages/Admin';
 import PortaleTesserato from './pages/PortaleTesserato';
+import FormIscrizione from './pages/FormIscrizione';
+import Iscrizioni from './pages/Iscrizioni';
 
 const RouteGuard: React.FC<{ children: React.ReactNode; titolo?: string; sezione?: string; soloAdmin?: boolean }> = ({
   children, titolo, sezione, soloAdmin
@@ -53,6 +55,8 @@ const App: React.FC = () => {
           <Route path="/prima-nota" element={<RouteGuard titolo="Prima nota" sezione="pagamenti"><div className="p-6"><div className="bg-white rounded-lg shadow p-8 text-center"><p className="text-gray-400 text-lg mb-2">📒 Prima nota</p><p className="text-gray-500 text-sm">Funzionalità in arrivo — registra tutte le entrate e uscite dell'associazione</p></div></div></RouteGuard>} />
           <Route path="/rendiconto" element={<RouteGuard titolo="Rendiconto" sezione="pagamenti"><div className="p-6"><div className="bg-white rounded-lg shadow p-8 text-center"><p className="text-gray-400 text-lg mb-2">📊 Rendiconto economico</p><p className="text-gray-500 text-sm">Funzionalità in arrivo — visualizza il bilancio entrate/uscite per periodo</p></div></div></RouteGuard>} />
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
+          <Route path="/iscrizioni" element={<RouteGuard titolo="Iscrizioni online"><Iscrizioni /></RouteGuard>} />
+          <Route path="/iscriviti/:token" element={<FormIscrizione />} />
           <Route path="/import" element={<Navigate to="/tesserati" />} />
         </Routes>
       </BrowserRouter>
