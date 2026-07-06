@@ -64,6 +64,7 @@ const PortaleTesserato: React.FC = () => {
   const [calAnno, setCalAnno] = useState(new Date().getFullYear());
   const [calMese, setCalMese] = useState(new Date().getMonth());
   const [giornoSelezionato, setGiornoSelezionato] = useState<string | null>(null);
+  const [msgSelezionato, setMsgSelezionato] = useState<number | null>(null);
   const [msgAnno, setMsgAnno] = useState(new Date().getFullYear());
   const [msgMese, setMsgMese] = useState(new Date().getMonth());
 
@@ -640,7 +641,6 @@ const PortaleTesserato: React.FC = () => {
             const GIORNI_IT = ['D','L','M','M','G','V','S'];
             const primoGiorno = new Date(msgAnno, msgMese, 1).getDay();
             const giorniNelMese = new Date(msgAnno, msgMese + 1, 0).getDate();
-            const [msgSelezionato, setMsgSelezionato] = React.useState<number | null>(null);
             const msgDelGiorno = (g: number) => {
               const dataStr = `${msgAnno}-${String(msgMese+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
               return messaggi.filter(m => m.data_invio.startsWith(dataStr));
