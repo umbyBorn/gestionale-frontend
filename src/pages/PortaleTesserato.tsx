@@ -734,45 +734,132 @@ const PortaleTesserato: React.FC = () => {
           })()}
 
           {/* PAGAMENTI */}
-          {sezione === 'pagamenti' && (
-            <div className="space-y-3">
-              <h2 className="font-bold text-gray-800">💳 I miei pagamenti</h2>
-              {pagamenti.length === 0 ? (
-                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-                  <p className="text-gray-300 text-4xl mb-2">✅</p>
-                  <p className="text-gray-400 text-sm">Nessun pagamento registrato</p>
+          {sezione === 'pagamenti' && (() => {
+            const daPagare = pagamenti.filter(p => !p.pagato);
+            const pagati = pagamenti.filter(p => p.pagato);
+            const totaleDaPagare = daPagare.reduce((a, p) => a + p.importo, 0);
+            const totalePagato = pagati.reduce((a, p) => a + p.importo, 0);
+            const totale = totaleDaPagare + totalePagato;
+            const percentualePagata = totale > 0 ? Math.round(totalePagato / totale * 100) : 0;
+            const scaduti = daPagare.filter(p => p.data_scadenza < oggi);
+            return (
+              <div className="space-y-4">
+
+                {/* RIEPILOGO */}
+                <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-2xl p-5 text-white">
+                  <p className="text-blue-200 text-xs font-medium uppercase tracking-wide mb-3">Riepilogo pagamenti</p>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-blue-200 text-xs">Totale pagato</p>
+                      <p className="text-2xl font-bold">€ {totalePagato.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-blue-200 text-xs">Da pagare</p>
+                      <p className={`text-2xl font-bold ${totaleDaPagare > 0 ? 'text-red-300' : 'text-green-300'}`}>
+                        € {totaleDaPagare.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  {/* BARRA PROGRESSO */}
+                  <div className="bg-white/20 rounded-full h-2 mb-1">
+                    <div className="bg-green-400 h-2 rounded-full transition-all"
+                      style={{width: `${percentualePagata}%`}} />
+                  </div>
+                  <p className="text-xs text-blue-200">{percentualePagata}% pagato</p>
                 </div>
-              ) : (
-                <>
-                  {pagamenti.filter(p => !p.pagato).length > 0 && (
-                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-                      <p className="text-sm font-bold text-red-700 mb-2">Da pagare</p>
-                      {pagamenti.filter(p => !p.pagato).map(p => (
-                        <div key={p.id} className="flex justify-between items-center py-2 border-b border-red-100 last:border-0">
-                          <p className="text-sm text-gray-700">Scad. {p.data_scadenza}</p>
-                          <p className="font-bold text-red-600">€ {p.importo.toFixed(2)}</p>
-                        </div>
-                      ))}
+
+                {/* AVVISO SCADUTI */}
+                {scaduti.length > 0 && (
+                  <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">⚠️</span>
+                      <div>
+                        <p className="font-bold text-red-700">{scaduti.length} pagamenti scaduti</p>
+                        <p className="text-xs text-red-500">Contatta la segreteria per regolarizzare</p>
+                      </div>
                     </div>
-                  )}
-                  {pagamenti.filter(p => p.pagato).length > 0 && (
-                    <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
-                      <p className="text-sm font-bold text-green-700 mb-2">Pagati</p>
-                      {pagamenti.filter(p => p.pagato).map(p => (
-                        <div key={p.id} className="flex justify-between items-center py-2 border-b border-green-100 last:border-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-green-500">✓</span>
-                            <p className="text-sm text-gray-700">€ {p.importo.toFixed(2)}</p>
+                    {scaduti.map(p => (
+                      <div key={p.id} className="flex justify-between items-center py-2 border-b border-red-100 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium text-red-700">Scaduto il {p.data_scadenza}</p>
+                        </div>
+                        <p className="font-bold text-red-600 text-lg">€ {p.importo.toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* DA PAGARE (non scaduti) */}
+                {daPagare.filter(p => p.data_scadenza >= oggi).length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-orange-50 px-4 py-3 border-b border-orange-100">
+                      <p className="font-bold text-orange-700 text-sm">📋 Da pagare</p>
+                    </div>
+                    {daPagare.filter(p => p.data_scadenza >= oggi).map(p => {
+                      const giorniMancanti = Math.ceil((new Date(p.data_scadenza).getTime() - new Date().getTime()) / 86400000);
+                      return (
+                        <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                            giorniMancanti <= 7 ? 'bg-red-100' : giorniMancanti <= 30 ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                            <span className="text-lg">💳</span>
                           </div>
-                          <p className="text-xs text-gray-400">{p.data_scadenza}</p>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-800">Quota associativa</p>
+                            <p className={`text-xs mt-0.5 ${
+                              giorniMancanti <= 7 ? 'text-red-500 font-medium' :
+                              giorniMancanti <= 30 ? 'text-orange-500' : 'text-gray-400'}`}>
+                              Scade {giorniMancanti === 0 ? 'oggi' : giorniMancanti === 1 ? 'domani' : `tra ${giorniMancanti} giorni`} · {p.data_scadenza}
+                            </p>
+                          </div>
+                          <p className="font-bold text-gray-800 text-lg">€ {p.importo.toFixed(2)}</p>
                         </div>
-                      ))}
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* PAGATI */}
+                {pagati.length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-green-50 px-4 py-3 border-b border-green-100">
+                      <div className="flex justify-between items-center">
+                        <p className="font-bold text-green-700 text-sm">✅ Pagamenti effettuati</p>
+                        <p className="text-xs text-green-600 font-medium">Totale: € {totalePagato.toFixed(2)}</p>
+                      </div>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                    {pagati.map(p => (
+                      <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <span className="text-green-600 font-bold">✓</span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-700">Quota pagata</p>
+                          <p className="text-xs text-gray-400">Scadenza: {p.data_scadenza}</p>
+                        </div>
+                        <p className="font-bold text-green-600">€ {p.importo.toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* TUTTO IN REGOLA */}
+                {daPagare.length === 0 && pagamenti.length > 0 && (
+                  <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-5 text-white text-center">
+                    <p className="text-4xl mb-2">🎉</p>
+                    <p className="font-bold text-lg">Sei in regola!</p>
+                    <p className="text-green-100 text-sm mt-1">Tutti i pagamenti sono stati effettuati</p>
+                  </div>
+                )}
+
+                {pagamenti.length === 0 && (
+                  <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                    <p className="text-gray-300 text-4xl mb-2">📭</p>
+                    <p className="text-gray-400 text-sm">Nessun pagamento registrato</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
