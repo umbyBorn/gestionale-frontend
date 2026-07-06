@@ -72,6 +72,12 @@ const MENU: VoceMenu[] = [
     ],
   },
   {
+    id: 'iscrizioni',
+    label: 'Iscrizioni online',
+    icona: '📝',
+    path: '/iscrizioni',
+  },
+  {
     id: 'impostazioni',
     label: 'Impostazioni',
     icona: '⚙️',
