@@ -137,11 +137,11 @@ const Layout: React.FC<LayoutProps> = ({ children, titolo }) => {
       `}>
         {/* LOGO */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
-          <span className="text-2xl">⚽</span>
+          <img src="/logo.png" alt="PGS Juvenilia" className="w-10 h-10 object-contain flex-shrink-0" />
           {sidebarAperta && (
-            <div>
-              <p className="font-bold text-white text-lg leading-none">Golè</p>
-              <p className="text-xs text-blue-300">Gestionale ASD</p>
+            <div className="min-w-0">
+              <p className="font-bold text-white text-sm leading-tight">PGS JUVENILIA</p>
+              <p className="text-xs text-blue-300 leading-tight">Gestionale</p>
             </div>
           )}
         </div>

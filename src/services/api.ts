@@ -48,10 +48,32 @@ export const eliminaGruppo = (id: number) => api.delete(`/gruppi/${id}`);
 
 // ---- PAGAMENTI ----
 export const getPagamenti = () => api.get('/pagamenti/');
+export const getPagamentiTesserato = (tesseratoId: number) => api.get(`/pagamenti/tesserato/${tesseratoId}`);
 export const getPagamentiScaduti = () => api.get('/pagamenti/scaduti/');
 export const creaPagamento = (data: any) => api.post('/pagamenti/', data);
+export const aggiornaPagamento = (id: number, data: any) => api.put(`/pagamenti/${id}`, data);
+export const eliminaPagamento = (id: number) => api.delete(`/pagamenti/${id}`);
 export const registraIncasso = (id: number, metodo: string) =>
   api.put(`/pagamenti/${id}/registra-incasso?metodo=${metodo}`);
+
+// Generazione automatica scadenze (es. Iscrizione + quote Settembre-Giugno)
+export const generaPianoScadenze = (data: any) => api.post('/pagamenti/piano-scadenze', data);
+// Pagamenti ad hoc di gruppo (completino, gita, torneo...)
+export const creaPagamentoGruppo = (data: any) => api.post('/pagamenti/gruppo', data);
+export const getPagamentiBatch = (batchId: string) => api.get(`/pagamenti/batch/${batchId}`);
+export const eliminaBatch = (batchId: string, soloNonPagati = true) =>
+  api.delete(`/pagamenti/batch/${batchId}?solo_non_pagati=${soloNonPagati}`);
+
+// ---- PRIMA NOTA ----
+export const getMovimenti = (params?: { data_da?: string; data_a?: string; tipo?: string; categoria?: string }) =>
+  api.get('/prima-nota/', { params });
+export const creaMovimento = (data: any) => api.post('/prima-nota/', data);
+export const aggiornaMovimento = (id: number, data: any) => api.put(`/prima-nota/${id}`, data);
+export const eliminaMovimento = (id: number) => api.delete(`/prima-nota/${id}`);
+
+// ---- RENDICONTO ----
+export const getRendiconto = (data_da?: string, data_a?: string) =>
+  api.get('/rendiconto/', { params: { data_da, data_a } });
 
 // ---- TARIFFE ----
 export const getTariffe = () => api.get('/tariffe/');
@@ -61,6 +83,21 @@ export const creaTariffa = (data: any) => api.post('/tariffe/', data);
 export const getStaff = () => api.get('/staff/');
 export const creaStaff = (data: any) => api.post('/staff/', data);
 export const aggiornaStaff = (id: number, data: any) => api.put(`/staff/${id}`, data);
+export const eliminaStaff = (id: number) => api.delete(`/staff/${id}`);
+export const getGruppiStaff = (id: number) => api.get(`/staff/${id}/gruppi`);
+export const aggiornaGruppiStaff = (id: number, gruppo_ids: number[]) => api.put(`/staff/${id}/gruppi`, { gruppo_ids });
+
+// ---- COMPENSI ----
+export const getCompensiStaff = (staffId: number) => api.get(`/staff/${staffId}/compensi`);
+export const creaCompenso = (data: any) => api.post('/compensi/', data);
+export const aggiornaCompenso = (id: number, data: any) => api.put(`/compensi/${id}`, data);
+export const eliminaCompenso = (id: number) => api.delete(`/compensi/${id}`);
+
+// ---- CONTRATTI ----
+export const getContrattiStaff = (staffId: number) => api.get(`/staff/${staffId}/contratti`);
+export const creaContratto = (data: any) => api.post('/contratti/', data);
+export const aggiornaContratto = (id: number, data: any) => api.put(`/contratti/${id}`, data);
+export const eliminaContratto = (id: number) => api.delete(`/contratti/${id}`);
 
 // ---- EVENTI E PRESENZE ----
 export const getEventi = () => api.get('/eventi/');
@@ -70,7 +107,18 @@ export const registraPresenza = (data: any) => api.post('/presenze/', data);
 
 // ---- ASSEMBLEE ----
 export const getAssemblee = () => api.get('/assemblee/');
+export const getAssemblea = (id: number) => api.get(`/assemblee/${id}`);
 export const creaAssemblea = (data: any) => api.post('/assemblee/', data);
+export const aggiornaAssemblea = (id: number, data: any) => api.put(`/assemblee/${id}`, data);
+export const eliminaAssemblea = (id: number) => api.delete(`/assemblee/${id}`);
+
+export const getPuntiAssemblea = (assembleaId: number) => api.get(`/assemblee/${assembleaId}/punti`);
+export const creaPunto = (data: any) => api.post('/punti/', data);
+export const aggiornaEsitoPunto = (id: number, esito: string) => api.put(`/punti/${id}/esito?esito=${encodeURIComponent(esito)}`);
+
+export const getPartecipantiAssemblea = (assembleaId: number) => api.get(`/assemblee/${assembleaId}/partecipanti`);
+export const registraPartecipazione = (data: any) => api.post('/partecipazioni/', data);
+export const aggiornaPartecipazione = (id: number, data: any) => api.put(`/partecipazioni/${id}`, data);
 
 export const getTesseratiGruppo = (gruppoId: number) =>
   api.get(`/messaggi/gruppi/${gruppoId}/tesserati`);
@@ -110,6 +158,19 @@ export const caricaDocumento = (tesseratoId: number, tipo: string, file: File, d
 export const eliminaDocumento = (documentoId: number) => api.delete(`/tesserati/documenti/${documentoId}`);
 
 export const eliminaTesseratoDefinitivo = (id: number) => api.delete(`/tesserati/${id}/definitivo`);
+
+// ---- IMPORTAZIONE ----
+export const importaTesserati = (file: File) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return api.post('/import/tesserati', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+
+export const importaStaff = (file: File) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return api.post('/import/staff', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
 
 // ---- ADMIN ----
 export const getUtenti = () => api.get('/admin/utenti');

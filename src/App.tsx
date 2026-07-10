@@ -16,6 +16,9 @@ import Admin from './pages/Admin';
 import PortaleTesserato from './pages/PortaleTesserato';
 import FormIscrizione from './pages/FormIscrizione';
 import Iscrizioni from './pages/Iscrizioni';
+import Importazione from './pages/Importazione';
+import PrimaNota from './pages/PrimaNota';
+import Rendiconto from './pages/Rendiconto';
 
 const RouteGuard: React.FC<{ children: React.ReactNode; titolo?: string; sezione?: string; soloAdmin?: boolean }> = ({
   children, titolo, sezione, soloAdmin
@@ -52,12 +55,12 @@ const App: React.FC = () => {
           <Route path="/assemblee" element={<RouteGuard titolo="Assemblee" sezione="assemblee"><Assemblee /></RouteGuard>} />
           <Route path="/calendario" element={<RouteGuard titolo="Calendario" sezione="calendario"><Calendario /></RouteGuard>} />
           <Route path="/messaggi" element={<RouteGuard titolo="Messaggi" sezione="messaggi"><Messaggi /></RouteGuard>} />
-          <Route path="/prima-nota" element={<RouteGuard titolo="Prima nota" sezione="pagamenti"><div className="p-6"><div className="bg-white rounded-lg shadow p-8 text-center"><p className="text-gray-400 text-lg mb-2">📒 Prima nota</p><p className="text-gray-500 text-sm">Funzionalità in arrivo — registra tutte le entrate e uscite dell'associazione</p></div></div></RouteGuard>} />
-          <Route path="/rendiconto" element={<RouteGuard titolo="Rendiconto" sezione="pagamenti"><div className="p-6"><div className="bg-white rounded-lg shadow p-8 text-center"><p className="text-gray-400 text-lg mb-2">📊 Rendiconto economico</p><p className="text-gray-500 text-sm">Funzionalità in arrivo — visualizza il bilancio entrate/uscite per periodo</p></div></div></RouteGuard>} />
+          <Route path="/prima-nota" element={<RouteGuard titolo="Prima nota" sezione="pagamenti"><PrimaNota /></RouteGuard>} />
+          <Route path="/rendiconto" element={<RouteGuard titolo="Rendiconto" sezione="pagamenti"><Rendiconto /></RouteGuard>} />
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
           <Route path="/iscrizioni" element={<RouteGuard titolo="Iscrizioni online"><Iscrizioni /></RouteGuard>} />
           <Route path="/iscriviti/:token" element={<FormIscrizione />} />
-          <Route path="/import" element={<Navigate to="/tesserati" />} />
+          <Route path="/import" element={<RouteGuard titolo="Importazione" sezione="tesserati"><Importazione /></RouteGuard>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -6,6 +6,7 @@ interface Gruppo {
   nome: string;
   descrizione?: string;
   attivo: boolean;
+  num_tesserati?: number;
 }
 
 interface Tesserato {
@@ -19,6 +20,18 @@ interface Tesserato {
   cellulare?: string;
   foto_url?: string;
 }
+
+// Palette di gradienti che ruota per ogni card, in linea con il tema del portale tesserato
+const GRADIENTI = [
+  'from-blue-600 to-blue-800',
+  'from-purple-600 to-purple-800',
+  'from-emerald-600 to-emerald-800',
+  'from-orange-500 to-orange-700',
+  'from-rose-500 to-rose-700',
+  'from-indigo-600 to-indigo-800',
+  'from-cyan-600 to-cyan-800',
+  'from-fuchsia-600 to-fuchsia-800',
+];
 
 const Gruppi: React.FC = () => {
   const [gruppi, setGruppi] = useState<Gruppo[]>([]);
@@ -45,6 +58,12 @@ const Gruppi: React.FC = () => {
     const res = await getTesseratiGruppo(g.id);
     setTesseratiGruppo(res.data);
     setLoadingTesserati(false);
+  };
+
+  const apriNuovo = () => {
+    setEditingId(null);
+    setForm({ nome: '', descrizione: '' });
+    setMostraForm(true);
   };
 
   const apriModifica = (g: Gruppo) => {
@@ -79,62 +98,102 @@ const Gruppi: React.FC = () => {
     return oggi.getFullYear() - nascita.getFullYear();
   };
 
+  const totaleTesserati = gruppi.reduce((acc, g) => acc + (g.num_tesserati || 0), 0);
+
   return (
-    <div className="bg-gray-100 min-h-full">
-      <main className="p-6">
+    <div className="bg-gray-50 min-h-full">
+      <main className="p-6 max-w-6xl mx-auto">
+
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Gruppi</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {gruppi.length} {gruppi.length === 1 ? 'gruppo' : 'gruppi'} · {totaleTesserati} tesserati totali
+            </p>
+          </div>
+          <button
+            onClick={apriNuovo}
+            className="bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition shadow-sm w-fit"
+          >
+            + Nuovo gruppo
+          </button>
+        </div>
+
         {loading ? (
           <p className="text-gray-500">Caricamento...</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {gruppi.map((g) => (
-              <div key={g.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition cursor-pointer"
-                onClick={() => apriDettaglioGruppo(g)}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-bold text-gray-800 text-lg">{g.nome}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{g.descrizione || 'Nessuna descrizione'}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {gruppi.map((g, i) => {
+              const gradiente = GRADIENTI[i % GRADIENTI.length];
+              return (
+                <div
+                  key={g.id}
+                  onClick={() => apriDettaglioGruppo(g)}
+                  className="bg-white rounded-2xl shadow-sm hover:shadow-lg transition cursor-pointer overflow-hidden group"
+                >
+                  {/* HEADER GRADIENTE */}
+                  <div className={`bg-gradient-to-r ${gradiente} px-4 py-4 flex items-center justify-between`}>
+                    <h3 className="font-bold text-white text-lg truncate pr-2">{g.nome}</h3>
+                    <div className="bg-white/20 backdrop-blur-sm text-white text-sm font-bold px-3 py-1 rounded-full flex-shrink-0 flex items-center gap-1">
+                      <span>👥</span>
+                      <span>{g.num_tesserati ?? 0}</span>
+                    </div>
                   </div>
-                  <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => apriModifica(g)} className="text-blue-600 hover:text-blue-800 text-xs">
-                      Modifica
-                    </button>
-                    <button onClick={() => handleElimina(g.id)} className="text-red-500 hover:text-red-700 text-xs">
-                      Disattiva
-                    </button>
+
+                  {/* CORPO */}
+                  <div className="p-4">
+                    <p className="text-sm text-gray-500 mb-4 min-h-[20px] line-clamp-2">
+                      {g.descrizione || 'Nessuna descrizione'}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-blue-600 font-semibold group-hover:underline">
+                        Vedi tesserati →
+                      </span>
+                      <div className="flex gap-3" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => apriModifica(g)} className="text-gray-400 hover:text-blue-600 text-xs font-medium transition">
+                          Modifica
+                        </button>
+                        <button onClick={() => handleElimina(g.id)} className="text-gray-400 hover:text-red-500 text-xs font-medium transition">
+                          Disattiva
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="mt-3 text-xs text-blue-600 font-medium">
-                  Clicca per vedere i tesserati del gruppo →
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {gruppi.length === 0 && (
-              <p className="text-gray-400 col-span-3">Nessun gruppo creato</p>
+              <div className="col-span-full bg-white rounded-2xl shadow-sm p-10 text-center">
+                <p className="text-4xl mb-3">👥</p>
+                <p className="text-gray-500 font-medium">Nessun gruppo creato</p>
+                <p className="text-gray-400 text-sm mt-1">Crea il primo gruppo per iniziare a organizzare i tesserati</p>
+              </div>
             )}
           </div>
         )}
 
         {/* FORM NUOVO/MODIFICA GRUPPO */}
         {mostraForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
               <h2 className="text-lg font-bold text-gray-800 mb-4">{editingId ? 'Modifica Gruppo' : 'Nuovo Gruppo'}</h2>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input type="text" value={form.nome}
                   onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione</label>
                 <textarea value={form.descrizione}
                   onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={3} />
               </div>
               <div className="flex gap-3 justify-end">
                 <button onClick={() => setMostraForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annulla</button>
-                <button onClick={handleSubmit} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Salva</button>
+                <button onClick={handleSubmit} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">Salva</button>
               </div>
             </div>
           </div>
@@ -143,20 +202,23 @@ const Gruppi: React.FC = () => {
         {/* DETTAGLIO GRUPPO CON LISTA TESSERATI */}
         {gruppoSelezionato && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-              <div className="px-6 py-4 border-b flex justify-between items-center">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+              <div className={`px-6 py-5 bg-gradient-to-r ${GRADIENTI[gruppi.findIndex(g => g.id === gruppoSelezionato.id) % GRADIENTI.length]} flex justify-between items-center`}>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-800">{gruppoSelezionato.nome}</h2>
-                  <p className="text-sm text-gray-500">{tesseratiGruppo.length} tesserati iscritti</p>
+                  <h2 className="text-lg font-bold text-white">{gruppoSelezionato.nome}</h2>
+                  <p className="text-sm text-white/80">{tesseratiGruppo.length} tesserati iscritti</p>
                 </div>
-                <button onClick={() => setGruppoSelezionato(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+                <button onClick={() => setGruppoSelezionato(null)} className="text-white/80 hover:text-white text-xl">✕</button>
               </div>
 
               <div className="overflow-y-auto flex-1">
                 {loadingTesserati ? (
                   <p className="p-6 text-gray-500">Caricamento...</p>
                 ) : tesseratiGruppo.length === 0 ? (
-                  <p className="p-6 text-gray-400">Nessun tesserato iscritto a questo gruppo</p>
+                  <div className="p-10 text-center">
+                    <p className="text-3xl mb-2">🗂️</p>
+                    <p className="text-gray-400">Nessun tesserato iscritto a questo gruppo</p>
+                  </div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b sticky top-0">
@@ -185,7 +247,7 @@ const Gruppi: React.FC = () => {
                           <td className="px-4 py-2">{t.categoria || '-'}</td>
                           <td className="px-4 py-2 text-xs">{t.cellulare || t.telefono || t.email || '-'}</td>
                           <td className="px-4 py-2">
-                            <a href={`/tesserati?gruppo=${encodeURIComponent(gruppoSelezionato.nome)}`} className="text-blue-600 hover:text-blue-800 text-xs">
+                            <a href={`/tesserati?gruppo=${encodeURIComponent(gruppoSelezionato.nome)}`} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
                               Vai alla scheda →
                             </a>
                           </td>
@@ -196,9 +258,9 @@ const Gruppi: React.FC = () => {
                 )}
               </div>
 
-              <div className="px-6 py-3 border-t flex justify-between items-center">
+              <div className="px-6 py-3 border-t flex justify-between items-center bg-gray-50">
                 <span className="text-xs text-gray-400">Clicca "Vai alla scheda" per aprire la scheda completa del tesserato</span>
-                <button onClick={() => setGruppoSelezionato(null)} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Chiudi</button>
+                <button onClick={() => setGruppoSelezionato(null)} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">Chiudi</button>
               </div>
             </div>
           </div>

@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { getPagamenti, creaPagamento, getTariffe, creaTariffa, getTesserati, registraIncasso } from '../services/api';
+import {
+  getPagamenti, creaPagamento, aggiornaPagamento, eliminaPagamento,
+  getTariffe, creaTariffa, getTesserati, registraIncasso,
+  generaPianoScadenze, creaPagamentoGruppo, getGruppi,
+} from '../services/api';
 
 interface Pagamento {
   id: number;
@@ -10,50 +14,79 @@ interface Pagamento {
   data_pagamento?: string;
   metodo?: string;
   pagato: boolean;
+  descrizione?: string;
+  gruppo_generazione_id?: string;
 }
+interface Tariffa { id: number; nome: string; importo: number; categoria?: string; }
+interface Tesserato { id: number; nome: string; cognome: string; }
+interface Gruppo { id: number; nome: string; }
 
-interface Tariffa {
-  id: number;
-  nome: string;
-  importo: number;
-  categoria?: string;
-}
-
-interface Tesserato {
-  id: number;
-  nome: string;
-  cognome: string;
-}
+const TAB = [
+  { id: 'scadenzario', label: '📋 Scadenzario' },
+  { id: 'piano', label: '🗓️ Genera piano quote' },
+  { id: 'ad-hoc', label: '🎽 Pagamento di gruppo' },
+  { id: 'tariffe', label: '🏷️ Tariffe' },
+] as const;
+type TabId = typeof TAB[number]['id'];
 
 const Pagamenti: React.FC = () => {
+  const [tab, setTab] = useState<TabId>('scadenzario');
   const [pagamenti, setPagamenti] = useState<Pagamento[]>([]);
   const [tariffe, setTariffe] = useState<Tariffa[]>([]);
   const [tesserati, setTesserati] = useState<Tesserato[]>([]);
+  const [gruppi, setGruppi] = useState<Gruppo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState<'tutti' | 'pagati' | 'scaduti'>('tutti');
+  const [ricerca, setRicerca] = useState('');
+
   const [mostraFormPagamento, setMostraFormPagamento] = useState(false);
   const [mostraFormTariffa, setMostraFormTariffa] = useState(false);
-  const [filtro, setFiltro] = useState<'tutti' | 'pagati' | 'scaduti'>('tutti');
+  const [pagamentoInModifica, setPagamentoInModifica] = useState<Pagamento | null>(null);
+  const [messaggio, setMessaggio] = useState('');
+
   const [formPagamento, setFormPagamento] = useState({
-    tesserato_id: 0, tariffa_id: 0, importo: 0, data_scadenza: '', pagato: false
+    tesserato_id: 0, tariffa_id: 0, importo: 0, data_scadenza: '', pagato: false, descrizione: '',
   });
   const [formTariffa, setFormTariffa] = useState({ nome: '', importo: 0, categoria: '' });
 
   const carica = () => {
-    Promise.all([getPagamenti(), getTariffe(), getTesserati()]).then(([p, t, ts]) => {
+    Promise.all([getPagamenti(), getTariffe(), getTesserati(), getGruppi()]).then(([p, t, ts, g]) => {
       setPagamenti(p.data);
       setTariffe(t.data);
       setTesserati(ts.data);
+      setGruppi(g.data);
       setLoading(false);
     });
   };
 
   useEffect(() => { carica(); }, []);
 
+  const flash = (msg: string) => { setMessaggio(msg); setTimeout(() => setMessaggio(''), 4000); };
+
   const handleCreaPagamento = async () => {
     await creaPagamento(formPagamento);
     setMostraFormPagamento(false);
-    setFormPagamento({ tesserato_id: 0, tariffa_id: 0, importo: 0, data_scadenza: '', pagato: false });
+    setFormPagamento({ tesserato_id: 0, tariffa_id: 0, importo: 0, data_scadenza: '', pagato: false, descrizione: '' });
     carica();
+  };
+
+  const handleSalvaModifica = async () => {
+    if (!pagamentoInModifica) return;
+    await aggiornaPagamento(pagamentoInModifica.id, {
+      importo: pagamentoInModifica.importo,
+      data_scadenza: pagamentoInModifica.data_scadenza,
+      tariffa_id: pagamentoInModifica.tariffa_id,
+      descrizione: pagamentoInModifica.descrizione,
+    });
+    setPagamentoInModifica(null);
+    carica();
+  };
+
+  const handleElimina = async (id: number) => {
+    if (window.confirm('Eliminare questo pagamento?')) {
+      await eliminaPagamento(id);
+      carica();
+    }
   };
 
   const handleCreaTariffa = async () => {
@@ -64,7 +97,7 @@ const Pagamenti: React.FC = () => {
   };
 
   const handleIncasso = async (id: number) => {
-    const metodo = window.prompt('Metodo di pagamento (contanti / bonifico / altro):');
+    const metodo = window.prompt('Metodo di pagamento (contanti / bonifico / altro):', 'contanti');
     if (metodo && ['contanti', 'bonifico', 'altro'].includes(metodo)) {
       await registraIncasso(id, metodo);
       carica();
@@ -75,7 +108,6 @@ const Pagamenti: React.FC = () => {
     const t = tesserati.find((t) => t.id === id);
     return t ? `${t.nome} ${t.cognome}` : `ID ${id}`;
   };
-
   const nomeTariffa = (id: number) => {
     const t = tariffe.find((t) => t.id === id);
     return t ? t.nome : `ID ${id}`;
@@ -84,108 +116,223 @@ const Pagamenti: React.FC = () => {
   const oggi = new Date().toISOString().split('T')[0];
 
   const filtrati = pagamenti.filter((p) => {
-    if (filtro === 'pagati') return p.pagato;
-    if (filtro === 'scaduti') return !p.pagato && p.data_scadenza < oggi;
+    if (filtro === 'pagati' && !p.pagato) return false;
+    if (filtro === 'scaduti' && (p.pagato || p.data_scadenza >= oggi)) return false;
+    if (ricerca && !nomeTesserato(p.tesserato_id).toLowerCase().includes(ricerca.toLowerCase())) return false;
     return true;
   });
 
+  const totalePagato = pagamenti.filter(p => p.pagato).reduce((a, p) => a + Number(p.importo), 0);
+  const totaleDaIncassare = pagamenti.filter(p => !p.pagato).reduce((a, p) => a + Number(p.importo), 0);
+  const totaleScaduto = pagamenti.filter(p => !p.pagato && p.data_scadenza < oggi).reduce((a, p) => a + Number(p.importo), 0);
+
   return (
-    <div className="bg-gray-100 min-h-full">
-      <main className="p-6">
-        <div className="flex gap-2 mb-6">
-          {(['tutti', 'scaduti', 'pagati'] as const).map((f) => (
+    <div className="bg-gray-50 min-h-full">
+      <main className="p-6 max-w-6xl mx-auto">
+
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-gray-800">Contabilità</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Gestione quote, pagamenti e scadenzario tesserati</p>
+        </div>
+
+        {/* RIEPILOGO */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-gradient-to-br from-green-500 to-green-700 rounded-2xl p-4 text-white shadow-sm">
+            <p className="text-green-100 text-xs uppercase tracking-wide">Incassato</p>
+            <p className="text-2xl font-bold mt-1">€ {totalePagato.toFixed(2)}</p>
+          </div>
+          <div className="bg-gradient-to-br from-orange-500 to-orange-700 rounded-2xl p-4 text-white shadow-sm">
+            <p className="text-orange-100 text-xs uppercase tracking-wide">Da incassare</p>
+            <p className="text-2xl font-bold mt-1">€ {totaleDaIncassare.toFixed(2)}</p>
+          </div>
+          <div className="bg-gradient-to-br from-red-500 to-red-700 rounded-2xl p-4 text-white shadow-sm">
+            <p className="text-red-100 text-xs uppercase tracking-wide">Scaduto</p>
+            <p className="text-2xl font-bold mt-1">€ {totaleScaduto.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* TAB NAV */}
+        <div className="flex gap-1 mb-5 overflow-x-auto bg-white rounded-xl p-1 shadow-sm w-fit">
+          {TAB.map(t => (
             <button
-              key={f}
-              onClick={() => setFiltro(f)}
-              className={`px-4 py-1 rounded text-sm font-medium ${filtro === f ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 border'}`}
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                tab === t.id ? 'bg-blue-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+              }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {t.label}
             </button>
           ))}
         </div>
-        {loading ? (
-          <p className="text-gray-500">Caricamento...</p>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-blue-800 text-white">
-                <tr>
-                  <th className="px-4 py-3 text-left">Tesserato</th>
-                  <th className="px-4 py-3 text-left">Tariffa</th>
-                  <th className="px-4 py-3 text-left">Importo</th>
-                  <th className="px-4 py-3 text-left">Scadenza</th>
-                  <th className="px-4 py-3 text-left">Stato</th>
-                  <th className="px-4 py-3 text-left">Azioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrati.map((p, i) => (
-                  <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3">{nomeTesserato(p.tesserato_id)}</td>
-                    <td className="px-4 py-3">{nomeTariffa(p.tariffa_id)}</td>
-                    <td className="px-4 py-3">€ {p.importo}</td>
-                    <td className="px-4 py-3">{p.data_scadenza}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        p.pagato ? 'bg-green-100 text-green-700' :
-                        p.data_scadenza < oggi ? 'bg-red-100 text-red-600' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {p.pagato ? 'Pagato' : p.data_scadenza < oggi ? 'Scaduto' : 'In attesa'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {!p.pagato && (
-                        <button onClick={() => handleIncasso(p.id)} className="text-green-600 hover:text-green-800 text-xs">
-                          Registra incasso
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {filtrati.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Nessun pagamento trovato</td></tr>
-                )}
-              </tbody>
-            </table>
+
+        {messaggio && (
+          <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 mb-4 text-sm">
+            {messaggio}
           </div>
         )}
 
+        {loading ? (
+          <p className="text-gray-500">Caricamento...</p>
+        ) : (
+          <>
+            {/* ============ SCADENZARIO ============ */}
+            {tab === 'scadenzario' && (
+              <div>
+                <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                  <div className="flex gap-2">
+                    {(['tutti', 'scaduti', 'pagati'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setFiltro(f)}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                          filtro === f ? 'bg-blue-700 text-white' : 'bg-white text-gray-600 border border-gray-200'
+                        }`}
+                      >
+                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text" placeholder="Cerca tesserato..." value={ricerca}
+                    onChange={e => setRicerca(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 max-w-xs"
+                  />
+                  <button
+                    onClick={() => setMostraFormPagamento(true)}
+                    className="ml-auto bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
+                  >
+                    + Pagamento singolo
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Tesserato</th>
+                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Voce</th>
+                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Importo</th>
+                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Scadenza</th>
+                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Stato</th>
+                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Azioni</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtrati.map((p, i) => (
+                        <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                          <td className="px-4 py-3 font-medium text-gray-700">{nomeTesserato(p.tesserato_id)}</td>
+                          <td className="px-4 py-3 text-gray-500">{p.descrizione || nomeTariffa(p.tariffa_id)}</td>
+                          <td className="px-4 py-3 font-medium">€ {Number(p.importo).toFixed(2)}</td>
+                          <td className="px-4 py-3">{p.data_scadenza}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              p.pagato ? 'bg-green-100 text-green-700' :
+                              p.data_scadenza < oggi ? 'bg-red-100 text-red-600' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {p.pagato ? 'Pagato' : p.data_scadenza < oggi ? 'Scaduto' : 'In attesa'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-3">
+                              {!p.pagato && (
+                                <button onClick={() => handleIncasso(p.id)} className="text-green-600 hover:text-green-800 text-xs font-medium">
+                                  Incassa
+                                </button>
+                              )}
+                              <button onClick={() => setPagamentoInModifica(p)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                                Modifica
+                              </button>
+                              <button onClick={() => handleElimina(p.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                                Elimina
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filtrati.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">Nessun pagamento trovato</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ============ GENERA PIANO QUOTE ============ */}
+            {tab === 'piano' && (
+              <GeneraPianoQuote gruppi={gruppi} tesserati={tesserati} onCreato={(msg) => { flash(msg); carica(); setTab('scadenzario'); }} />
+            )}
+
+            {/* ============ PAGAMENTO AD HOC DI GRUPPO ============ */}
+            {tab === 'ad-hoc' && (
+              <PagamentoAdHocGruppo gruppi={gruppi} tesserati={tesserati} onCreato={(msg) => { flash(msg); carica(); setTab('scadenzario'); }} />
+            )}
+
+            {/* ============ TARIFFE ============ */}
+            {tab === 'tariffe' && (
+              <div>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setMostraFormTariffa(true)}
+                    className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
+                  >
+                    + Nuova tariffa
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {tariffe.map(t => (
+                    <div key={t.id} className="bg-white rounded-2xl shadow-sm p-4">
+                      <p className="font-bold text-gray-800">{t.nome}</p>
+                      <p className="text-2xl font-bold text-blue-700 mt-1">€ {Number(t.importo).toFixed(2)}</p>
+                      {t.categoria && <p className="text-xs text-gray-400 mt-1">{t.categoria}</p>}
+                    </div>
+                  ))}
+                  {tariffe.length === 0 && <p className="text-gray-400 col-span-3">Nessuna tariffa creata</p>}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* FORM NUOVA TARIFFA */}
         {mostraFormTariffa && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
               <h2 className="text-lg font-bold text-gray-800 mb-4">Nuova Tariffa</h2>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input type="text" value={formTariffa.nome} onChange={(e) => setFormTariffa({ ...formTariffa, nome: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Importo (€)</label>
                 <input type="number" value={formTariffa.importo} onChange={(e) => setFormTariffa({ ...formTariffa, importo: parseFloat(e.target.value) })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
                 <input type="text" value={formTariffa.categoria} onChange={(e) => setFormTariffa({ ...formTariffa, categoria: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="flex gap-3 justify-end">
                 <button onClick={() => setMostraFormTariffa(false)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
-                <button onClick={handleCreaTariffa} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Salva</button>
+                <button onClick={handleCreaTariffa} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-800">Salva</button>
               </div>
             </div>
           </div>
         )}
 
+        {/* FORM NUOVO PAGAMENTO SINGOLO */}
         {mostraFormPagamento && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
               <h2 className="text-lg font-bold text-gray-800 mb-4">Nuovo Pagamento</h2>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tesserato</label>
                 <select value={formPagamento.tesserato_id} onChange={(e) => setFormPagamento({ ...formPagamento, tesserato_id: parseInt(e.target.value) })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value={0}>Seleziona tesserato</option>
                   {tesserati.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>)}
                 </select>
@@ -194,8 +341,8 @@ const Pagamenti: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tariffa</label>
                 <select value={formPagamento.tariffa_id} onChange={(e) => {
                   const tariffa = tariffe.find(t => t.id === parseInt(e.target.value));
-                  setFormPagamento({ ...formPagamento, tariffa_id: parseInt(e.target.value), importo: tariffa?.importo || 0 });
-                }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  setFormPagamento({ ...formPagamento, tariffa_id: parseInt(e.target.value), importo: tariffa?.importo || 0, descrizione: tariffa?.nome || '' });
+                }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value={0}>Seleziona tariffa</option>
                   {tariffe.map((t) => <option key={t.id} value={t.id}>{t.nome} — €{t.importo}</option>)}
                 </select>
@@ -203,21 +350,364 @@ const Pagamenti: React.FC = () => {
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Importo (€)</label>
                 <input type="number" value={formPagamento.importo} onChange={(e) => setFormPagamento({ ...formPagamento, importo: parseFloat(e.target.value) })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data scadenza</label>
                 <input type="date" value={formPagamento.data_scadenza} onChange={(e) => setFormPagamento({ ...formPagamento, data_scadenza: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="flex gap-3 justify-end">
                 <button onClick={() => setMostraFormPagamento(false)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
-                <button onClick={handleCreaPagamento} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Salva</button>
+                <button onClick={handleCreaPagamento} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-800">Salva</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODIFICA PAGAMENTO SINGOLO */}
+        {pagamentoInModifica && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+              <h2 className="text-lg font-bold text-gray-800 mb-1">Modifica pagamento</h2>
+              <p className="text-sm text-gray-500 mb-4">{nomeTesserato(pagamentoInModifica.tesserato_id)}</p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Voce</label>
+                <input type="text" value={pagamentoInModifica.descrizione || ''}
+                  onChange={(e) => setPagamentoInModifica({ ...pagamentoInModifica, descrizione: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Importo (€)</label>
+                <input type="number" value={pagamentoInModifica.importo}
+                  onChange={(e) => setPagamentoInModifica({ ...pagamentoInModifica, importo: parseFloat(e.target.value) })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data scadenza</label>
+                <input type="date" value={pagamentoInModifica.data_scadenza}
+                  onChange={(e) => setPagamentoInModifica({ ...pagamentoInModifica, data_scadenza: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setPagamentoInModifica(null)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button onClick={handleSalvaModifica} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-800">Salva</button>
               </div>
             </div>
           </div>
         )}
       </main>
+    </div>
+  );
+};
+
+
+// ============================================================
+// GENERA PIANO QUOTE: iscrizione + quote mensili da mese a mese
+// ============================================================
+interface VoceScadenza { nome: string; importo: number; data_scadenza: string; }
+
+const MESI = [
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
+];
+
+const GeneraPianoQuote: React.FC<{
+  gruppi: Gruppo[]; tesserati: Tesserato[]; onCreato: (msg: string) => void;
+}> = ({ gruppi, tesserati, onCreato }) => {
+  const [destinatario, setDestinatario] = useState<'gruppo' | 'tutti'>('gruppo');
+  const [gruppoId, setGruppoId] = useState(0);
+  const [conIscrizione, setConIscrizione] = useState(true);
+  const [importoIscrizione, setImportoIscrizione] = useState(50);
+  const [dataIscrizione, setDataIscrizione] = useState('');
+  const [importoMensile, setImportoMensile] = useState(40);
+  const [meseInizio, setMeseInizio] = useState(8); // Settembre (0-indexed)
+  const [meseFine, setMeseFine] = useState(5); // Giugno
+  const [annoInizio, setAnnoInizio] = useState(new Date().getFullYear());
+  const [giornoScadenza, setGiornoScadenza] = useState(5);
+  const [voci, setVoci] = useState<VoceScadenza[] | null>(null);
+  const [inviando, setInviando] = useState(false);
+
+  const generaAnteprima = () => {
+    const risultato: VoceScadenza[] = [];
+    if (conIscrizione && dataIscrizione) {
+      risultato.push({ nome: 'Iscrizione', importo: importoIscrizione, data_scadenza: dataIscrizione });
+    }
+    // Genera le mensilità: da meseInizio (anno inizio) a meseFine (anno inizio+1 se meseFine < meseInizio)
+    let mese = meseInizio;
+    let anno = annoInizio;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const dataStr = `${anno}-${String(mese + 1).padStart(2, '0')}-${String(giornoScadenza).padStart(2, '0')}`;
+      risultato.push({ nome: MESI[mese], importo: importoMensile, data_scadenza: dataStr });
+      if (mese === meseFine) break;
+      mese = (mese + 1) % 12;
+      if (mese === 0) anno += 1;
+    }
+    setVoci(risultato);
+  };
+
+  const aggiornaVoce = (i: number, campo: keyof VoceScadenza, valore: string | number) => {
+    if (!voci) return;
+    const copia = [...voci];
+    (copia[i] as any)[campo] = valore;
+    setVoci(copia);
+  };
+
+  const rimuoviVoce = (i: number) => {
+    if (!voci) return;
+    setVoci(voci.filter((_, idx) => idx !== i));
+  };
+
+  const aggiungiVoce = () => {
+    if (!voci) return;
+    setVoci([...voci, { nome: 'Voce extra', importo: 0, data_scadenza: '' }]);
+  };
+
+  const confermaGenerazione = async () => {
+    if (!voci || voci.length === 0) return;
+    setInviando(true);
+    try {
+      const payload: any = { voci };
+      if (destinatario === 'gruppo') {
+        if (!gruppoId) { alert('Seleziona un gruppo'); setInviando(false); return; }
+        payload.gruppo_id = gruppoId;
+      } else {
+        payload.tesserato_ids = tesserati.map(t => t.id);
+      }
+      const res = await generaPianoScadenze(payload);
+      onCreato(`Creati ${res.data.pagamenti_creati} pagamenti per ${res.data.tesserati_coinvolti} tesserati.`);
+      setVoci(null);
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || 'Errore nella generazione del piano');
+    } finally {
+      setInviando(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {/* FORM CONFIGURAZIONE */}
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="font-bold text-gray-800 mb-4">Configura il piano di scadenze</h2>
+
+        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Destinatari</label>
+        <div className="flex gap-2 mb-4">
+          <button onClick={() => setDestinatario('gruppo')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${destinatario === 'gruppo' ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-600'}`}>
+            Un gruppo
+          </button>
+          <button onClick={() => setDestinatario('tutti')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${destinatario === 'tutti' ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-600'}`}>
+            Tutti i tesserati
+          </button>
+        </div>
+        {destinatario === 'gruppo' && (
+          <select value={gruppoId} onChange={e => setGruppoId(parseInt(e.target.value))}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4">
+            <option value={0}>Seleziona gruppo</option>
+            {gruppi.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+          </select>
+        )}
+
+        <div className="border-t pt-4 mb-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+            <input type="checkbox" checked={conIscrizione} onChange={e => setConIscrizione(e.target.checked)} />
+            Includi quota di iscrizione
+          </label>
+          {conIscrizione && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Importo iscrizione (€)</label>
+                <input type="number" value={importoIscrizione} onChange={e => setImportoIscrizione(parseFloat(e.target.value))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Scadenza iscrizione</label>
+                <input type="date" value={dataIscrizione} onChange={e => setDataIscrizione(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Quota mensile</label>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Importo mensile (€)</label>
+              <input type="number" value={importoMensile} onChange={e => setImportoMensile(parseFloat(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Giorno di scadenza</label>
+              <input type="number" min={1} max={28} value={giornoScadenza} onChange={e => setGiornoScadenza(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Da mese</label>
+              <select value={meseInizio} onChange={e => setMeseInizio(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                {MESI.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">A mese</label>
+              <select value={meseFine} onChange={e => setMeseFine(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                {MESI.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Anno iniziale</label>
+              <input type="number" value={annoInizio} onChange={e => setAnnoInizio(parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            Es. da Settembre a Giugno genera automaticamente 10 rate, passando all'anno successivo dopo Dicembre.
+          </p>
+        </div>
+
+        <button onClick={generaAnteprima} className="w-full mt-5 bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 transition">
+          Genera anteprima →
+        </button>
+      </div>
+
+      {/* ANTEPRIMA / CONFERMA */}
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="font-bold text-gray-800 mb-4">Anteprima scadenzario</h2>
+        {!voci ? (
+          <div className="text-center py-16 text-gray-400">
+            <p className="text-3xl mb-2">🗓️</p>
+            <p className="text-sm">Configura il piano e genera l'anteprima per vedere qui le voci</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2 max-h-96 overflow-y-auto mb-4">
+              {voci.map((v, i) => (
+                <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+                  <input type="text" value={v.nome} onChange={e => aggiornaVoce(i, 'nome', e.target.value)}
+                    className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm min-w-0" />
+                  <input type="number" value={v.importo} onChange={e => aggiornaVoce(i, 'importo', parseFloat(e.target.value))}
+                    className="w-20 border border-gray-200 rounded px-2 py-1 text-sm" />
+                  <input type="date" value={v.data_scadenza} onChange={e => aggiornaVoce(i, 'data_scadenza', e.target.value)}
+                    className="w-36 border border-gray-200 rounded px-2 py-1 text-sm" />
+                  <button onClick={() => rimuoviVoce(i)} className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={aggiungiVoce} className="text-blue-600 text-sm font-medium mb-4 hover:underline">
+              + Aggiungi voce
+            </button>
+            <div className="flex items-center justify-between border-t pt-4">
+              <div>
+                <p className="text-xs text-gray-500">Totale per tesserato</p>
+                <p className="text-xl font-bold text-gray-800">€ {voci.reduce((a, v) => a + Number(v.importo), 0).toFixed(2)}</p>
+              </div>
+              <button onClick={confermaGenerazione} disabled={inviando}
+                className="bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50">
+                {inviando ? 'Generazione...' : 'Conferma e genera scadenze'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+// ============================================================
+// PAGAMENTO AD HOC DI GRUPPO (completino, gita, torneo...)
+// ============================================================
+const PagamentoAdHocGruppo: React.FC<{
+  gruppi: Gruppo[]; tesserati: Tesserato[]; onCreato: (msg: string) => void;
+}> = ({ gruppi, tesserati, onCreato }) => {
+  const [destinatario, setDestinatario] = useState<'gruppo' | 'tutti'>('gruppo');
+  const [gruppoId, setGruppoId] = useState(0);
+  const [nome, setNome] = useState('');
+  const [importo, setImporto] = useState(0);
+  const [dataScadenza, setDataScadenza] = useState('');
+  const [inviando, setInviando] = useState(false);
+
+  const suggerimenti = ['Completino gara', 'Gita di Natale', 'Torneo di Capodanno', 'Kit allenamento', 'Foto di squadra'];
+
+  const conferma = async () => {
+    if (!nome || !importo || !dataScadenza) { alert('Compila tutti i campi'); return; }
+    if (destinatario === 'gruppo' && !gruppoId) { alert('Seleziona un gruppo'); return; }
+    setInviando(true);
+    try {
+      const payload: any = { nome, importo, data_scadenza: dataScadenza };
+      if (destinatario === 'gruppo') payload.gruppo_id = gruppoId;
+      else payload.tesserato_ids = tesserati.map(t => t.id);
+      const res = await creaPagamentoGruppo(payload);
+      onCreato(`Creato pagamento "${nome}" per ${res.data.tesserati_coinvolti} tesserati.`);
+      setNome(''); setImporto(0); setDataScadenza('');
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || 'Errore nella creazione del pagamento di gruppo');
+    } finally {
+      setInviando(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-5 max-w-xl">
+      <h2 className="font-bold text-gray-800 mb-1">Pagamento ad hoc per tutto il gruppo</h2>
+      <p className="text-sm text-gray-500 mb-4">
+        Per spese occasionali non ricorrenti: completino, gita, torneo, kit, ecc.
+      </p>
+
+      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Destinatari</label>
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setDestinatario('gruppo')}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${destinatario === 'gruppo' ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-600'}`}>
+          Un gruppo
+        </button>
+        <button onClick={() => setDestinatario('tutti')}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${destinatario === 'tutti' ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-600'}`}>
+          Tutti i tesserati
+        </button>
+      </div>
+      {destinatario === 'gruppo' && (
+        <select value={gruppoId} onChange={e => setGruppoId(parseInt(e.target.value))}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4">
+          <option value={0}>Seleziona gruppo</option>
+          {gruppi.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+        </select>
+      )}
+
+      <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione voce</label>
+      <input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Es. Gita di Natale"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2" />
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {suggerimenti.map(s => (
+          <button key={s} onClick={() => setNome(s)}
+            className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full hover:bg-blue-100">
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Importo (€)</label>
+          <input type="number" value={importo} onChange={e => setImporto(parseFloat(e.target.value))}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Scadenza</label>
+          <input type="date" value={dataScadenza} onChange={e => setDataScadenza(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+      </div>
+
+      <button onClick={conferma} disabled={inviando}
+        className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50">
+        {inviando ? 'Creazione...' : 'Crea pagamento per il gruppo'}
+      </button>
     </div>
   );
 };

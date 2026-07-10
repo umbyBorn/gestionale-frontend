@@ -15,6 +15,7 @@ interface Tesserato {
   cap_residenza?: string; foto_url?: string; categoria?: string;
   cod_tessera?: string; tipo_tessera?: string; qualifica?: string; sport?: string;
   matricola?: string; data_emissione_tessera?: string; data_scadenza_tessera?: string;
+  data_scadenza_certificato_medico?: string;
 }
 interface Evento { id: number; titolo: string; data: string; tipo: string; ora_inizio?: string; ora_fine?: string; luogo?: string; gruppo_id: number; }
 interface Messaggio { id: number; intestazione: string; corpo: string; data_invio: string; }
@@ -128,10 +129,12 @@ const PortaleTesserato: React.FC = () => {
   };
 
   const scadenzaVisitaMedica = () => {
-    const docVisita = documenti.find(d => d.tipo.toLowerCase().includes('idoneit'));
-    if (!docVisita?.data_scadenza) return null;
-    const diff = Math.ceil((new Date(docVisita.data_scadenza).getTime() - new Date().getTime()) / 86400000);
-    return { giorni: diff, data: docVisita.data_scadenza };
+    // Priorità al campo dedicato sulla scheda tesserato; in mancanza, usa il documento caricato
+    const dataRiferimento = tesserato?.data_scadenza_certificato_medico
+      || documenti.find(d => d.tipo.toLowerCase().includes('idoneit'))?.data_scadenza;
+    if (!dataRiferimento) return null;
+    const diff = Math.ceil((new Date(dataRiferimento).getTime() - new Date().getTime()) / 86400000);
+    return { giorni: diff, data: dataRiferimento };
   };
 
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -351,6 +354,28 @@ const PortaleTesserato: React.FC = () => {
                 </div>
                 <div className="bg-white/10 rounded-xl p-2 text-xs text-blue-200 font-mono">{tesserato?.codice_fiscale}</div>
               </div>
+
+              {/* CERTIFICATO MEDICO SPORTIVO */}
+              {tesserato?.data_scadenza_certificato_medico && (() => {
+                const giorni = Math.ceil((new Date(tesserato.data_scadenza_certificato_medico).getTime() - new Date().getTime()) / 86400000);
+                const scaduto = giorni <= 0;
+                const inScadenza = !scaduto && giorni <= 30;
+                return (
+                  <div className={`rounded-2xl p-5 shadow-sm ${scaduto ? 'bg-red-50 border-2 border-red-200' : inScadenza ? 'bg-yellow-50 border-2 border-yellow-200' : 'bg-white'}`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🏥</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-700">Certificato medico sportivo</p>
+                        <p className={`text-sm ${scaduto ? 'text-red-600 font-bold' : inScadenza ? 'text-yellow-700 font-bold' : 'text-gray-500'}`}>
+                          {scaduto
+                            ? `Scaduto il ${tesserato.data_scadenza_certificato_medico}`
+                            : `Valido fino al ${tesserato.data_scadenza_certificato_medico}${inScadenza ? ` (${giorni} giorni)` : ''}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* QR CODE */}
               <div className="bg-white rounded-2xl p-6 shadow-sm text-center">

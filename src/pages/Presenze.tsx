@@ -158,61 +158,67 @@ const Presenze: React.FC = () => {
   const eventiGiornoSelezionato = giornoSelezionato ? eventi.filter(e => e.data === giornoSelezionato) : [];
 
   return (
-    <div className="bg-gray-100 min-h-full">
+    <div className="bg-gray-50 min-h-full">
       <main className="p-6 max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-gray-800">Calendario presenze</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Registra le presenze agli allenamenti e agli eventi</p>
+        </div>
         {loading ? <p className="text-gray-500">Caricamento...</p> : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* CALENDARIO */}
-            <div className="lg:col-span-2 bg-white rounded-lg shadow p-4">
-              <div className="flex justify-between items-center mb-4">
-                <button onClick={mesePrecedente} className="text-gray-600 hover:text-gray-900 px-2 py-1">◀</button>
-                <h2 className="text-lg font-bold text-gray-800">{MESI[mese]} {anno}</h2>
-                <button onClick={meseSuccessivo} className="text-gray-600 hover:text-gray-900 px-2 py-1">▶</button>
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="flex justify-between items-center px-5 py-4 bg-gradient-to-r from-blue-700 to-blue-900">
+                <button onClick={mesePrecedente} className="text-white/80 hover:text-white font-bold text-xl px-2">‹</button>
+                <h2 className="text-lg font-bold text-white">{MESI[mese]} {anno}</h2>
+                <button onClick={meseSuccessivo} className="text-white/80 hover:text-white font-bold text-xl px-2">›</button>
               </div>
 
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {GIORNI.map(g => (
-                  <div key={g} className="text-center text-xs font-semibold text-gray-500 py-1">{g}</div>
-                ))}
-              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {GIORNI.map(g => (
+                    <div key={g} className="text-center text-xs font-semibold text-gray-500 py-1">{g}</div>
+                  ))}
+                </div>
 
-              <div className="grid grid-cols-7 gap-1">
-                {Array.from({ length: offsetInizio }).map((_, i) => <div key={`empty-${i}`} />)}
-                {Array.from({ length: ultimoGiorno.getDate() }).map((_, i) => {
-                  const giorno = i + 1;
-                  const dataStr = `${anno}-${String(mese + 1).padStart(2, '0')}-${String(giorno).padStart(2, '0')}`;
-                  const eventiGiorno = eventiDelGiorno(giorno);
-                  const isOggi = dataStr === oggi.toISOString().split('T')[0];
-                  const isSelezionato = dataStr === giornoSelezionato;
-                  return (
-                    <div key={giorno}
-                      onClick={() => { setGiornoSelezionato(dataStr); setEventoSelezionato(null); }}
-                      className={`min-h-[60px] p-1 rounded cursor-pointer border transition ${
-                        isSelezionato ? 'border-blue-500 bg-blue-50' :
-                        isOggi ? 'border-blue-300 bg-blue-50' :
-                        'border-gray-100 hover:border-gray-300 hover:bg-gray-50'
-                      }`}>
-                      <div className={`text-xs font-medium mb-1 ${isOggi ? 'text-blue-700' : 'text-gray-700'}`}>{giorno}</div>
-                      {eventiGiorno.slice(0, 3).map(e => (
-                        <div key={e.id} className={`text-white text-xs rounded px-1 mb-0.5 truncate ${tipoColore[e.tipo] || 'bg-gray-500'}`}>
-                          {e.ora_inizio ? e.ora_inizio.substring(0,5) : ''} {e.titolo}
-                        </div>
-                      ))}
-                      {eventiGiorno.length > 3 && <div className="text-xs text-gray-400">+{eventiGiorno.length - 3}</div>}
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: offsetInizio }).map((_, i) => <div key={`empty-${i}`} />)}
+                  {Array.from({ length: ultimoGiorno.getDate() }).map((_, i) => {
+                    const giorno = i + 1;
+                    const dataStr = `${anno}-${String(mese + 1).padStart(2, '0')}-${String(giorno).padStart(2, '0')}`;
+                    const eventiGiorno = eventiDelGiorno(giorno);
+                    const isOggi = dataStr === oggi.toISOString().split('T')[0];
+                    const isSelezionato = dataStr === giornoSelezionato;
+                    return (
+                      <div key={giorno}
+                        onClick={() => { setGiornoSelezionato(dataStr); setEventoSelezionato(null); }}
+                        className={`min-h-[64px] p-1 rounded-lg cursor-pointer border transition ${
+                          isSelezionato ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' :
+                          isOggi ? 'border-blue-300 bg-blue-50' :
+                          'border-gray-100 hover:border-blue-200 hover:bg-blue-50/50'
+                        }`}>
+                        <div className={`text-xs font-medium mb-1 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
+                        {eventiGiorno.slice(0, 3).map(e => (
+                          <div key={e.id} className={`text-white text-xs rounded px-1 mb-0.5 truncate ${tipoColore[e.tipo] || 'bg-gray-500'}`}>
+                            {e.ora_inizio ? e.ora_inizio.substring(0,5) : ''} {e.titolo}
+                          </div>
+                        ))}
+                        {eventiGiorno.length > 3 && <div className="text-xs text-gray-400">+{eventiGiorno.length - 3}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Legenda */}
+                <div className="flex gap-4 mt-4 text-xs text-gray-500">
+                  {Object.entries(tipoColore).map(([tipo, colore]) => (
+                    <div key={tipo} className="flex items-center gap-1">
+                      <div className={`w-3 h-3 rounded ${colore}`} />
+                      <span className="capitalize">{tipo}</span>
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Legenda */}
-              <div className="flex gap-4 mt-4 text-xs text-gray-500">
-                {Object.entries(tipoColore).map(([tipo, colore]) => (
-                  <div key={tipo} className="flex items-center gap-1">
-                    <div className={`w-3 h-3 rounded ${colore}`} />
-                    <span className="capitalize">{tipo}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -220,7 +226,7 @@ const Presenze: React.FC = () => {
             <div className="space-y-4">
               {/* EVENTI DEL GIORNO */}
               {giornoSelezionato && (
-                <div className="bg-white rounded-lg shadow p-4">
+                <div className="bg-white rounded-2xl shadow-sm p-4">
                   <h3 className="font-bold text-gray-800 mb-3 text-sm">
                     {new Date(giornoSelezionato + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </h3>
@@ -262,7 +268,7 @@ const Presenze: React.FC = () => {
 
               {/* PRESENZE EVENTO */}
               {eventoSelezionato && (
-                <div className="bg-white rounded-lg shadow p-4">
+                <div className="bg-white rounded-2xl shadow-sm p-4">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-bold text-gray-800 text-sm">{eventoSelezionato.titolo}</h3>
                     <div className="flex gap-2">
@@ -305,7 +311,7 @@ const Presenze: React.FC = () => {
       {/* FORM NUOVO EVENTO */}
       {mostraFormEvento && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Nuovo Evento</h2>
             <div className="space-y-3">
               <div>

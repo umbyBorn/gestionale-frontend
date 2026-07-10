@@ -3,7 +3,8 @@ import {
   getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, eliminaTesseratoDefinitivo, getTuttiTesserati, riattivaTesserato,
   getGruppi, getGruppiTesserato, aggiornaGruppiTesserato,
   getGenitori, creaGenitore, aggiornaGenitore,
-  caricaFoto, getDocumenti, caricaDocumento, eliminaDocumento
+  caricaFoto, getDocumenti, caricaDocumento, eliminaDocumento,
+  getPagamentiTesserato, registraIncasso
 } from '../services/api';
 
 interface Tesserato {
@@ -14,7 +15,8 @@ interface Tesserato {
   provincia_residenza?: string; regione_residenza?: string; cap_residenza?: string;
   cod_tessera?: string; tipo_tessera?: string; categoria?: string;
   qualifica?: string; sport?: string; data_emissione_tessera?: string;
-  data_scadenza_tessera?: string; matricola?: string; disabile: boolean;
+  data_scadenza_tessera?: string; matricola?: string;
+  data_scadenza_certificato_medico?: string; disabile: boolean;
   straniero: boolean; titolo_studio?: string; e_socio: boolean;
   attivo: boolean; foto_url?: string; genitore_id?: number;
 }
@@ -28,11 +30,28 @@ const formVuoto = {
   stato_nascita: 'Italia', indirizzo: '', comune_residenza: '', provincia_residenza: '',
   regione_residenza: '', cap_residenza: '', cod_tessera: '', tipo_tessera: '',
   categoria: '', qualifica: '', sport: '', data_emissione_tessera: '',
-  data_scadenza_tessera: '', matricola: '', disabile: false, straniero: false,
+  data_scadenza_tessera: '', matricola: '', data_scadenza_certificato_medico: '',
+  disabile: false, straniero: false,
   titolo_studio: '', e_socio: true, genitore_id: null as number | null,
 };
 
 const formGenitoreVuoto = { nome: '', cognome: '', email: '', telefono: '', documento_tipo: '', documento_numero: '' };
+
+// Badge di stato per una data di scadenza (es. certificato medico, tessera)
+const BadgeScadenza: React.FC<{ data: string; giorniAvviso?: number }> = ({ data, giorniAvviso = 30 }) => {
+  const oggi = new Date();
+  const scadenza = new Date(data);
+  const giorni = Math.ceil((scadenza.getTime() - oggi.getTime()) / (1000 * 60 * 60 * 24));
+  let stile = 'bg-green-100 text-green-700';
+  let testo = 'Valido';
+  if (giorni < 0) { stile = 'bg-red-100 text-red-700'; testo = 'Scaduto'; }
+  else if (giorni <= giorniAvviso) { stile = 'bg-orange-100 text-orange-700'; testo = `In scadenza (${giorni}gg)`; }
+  return (
+    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${stile}`}>
+      {testo}
+    </span>
+  );
+};
 
 const SEZIONI = ['Anagrafica', 'Residenza', 'Tessera', 'Gruppi', 'Genitore'];
 
@@ -51,6 +70,7 @@ const Tesserati: React.FC = () => {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroCFTemp, setFiltroCFTemp] = useState(false);
   const [filtroTesseraScaduta, setFiltroTesseraScaduta] = useState(false);
+  const [filtroCertificatoScaduto, setFiltroCertificatoScaduto] = useState(false);
   const [mostraDisabilitati, setMostraDisabilitati] = useState(false);
   const [ordinamento, setOrdinamento] = useState<{campo: string, direzione: 'asc'|'desc'}>({campo: 'cognome', direzione: 'asc'});
   const [form, setForm] = useState(formVuoto);
@@ -58,6 +78,7 @@ const Tesserati: React.FC = () => {
   const [sezioneAttiva, setSezioneAttiva] = useState(0);
   const [mostraDettaglio, setMostraDettaglio] = useState<Tesserato | null>(null);
   const [documenti, setDocumenti] = useState<Documento[]>([]);
+  const [pagamentiTesserato, setPagamentiTesserato] = useState<any[]>([]);
   const [uploadFoto, setUploadFoto] = useState<File | null>(null);
   const [uploadDoc, setUploadDoc] = useState<{ file: File | null; tipo: string; scadenza: string; note: string }>({ file: null, tipo: '', scadenza: '', note: '' });
   const [mostraFormGenitore, setMostraFormGenitore] = useState(false);
@@ -91,7 +112,9 @@ const Tesserati: React.FC = () => {
       categoria: t.categoria || '', qualifica: t.qualifica || '', sport: t.sport || '',
       data_emissione_tessera: t.data_emissione_tessera || '',
       data_scadenza_tessera: t.data_scadenza_tessera || '',
-      matricola: t.matricola || '', disabile: t.disabile || false,
+      matricola: t.matricola || '',
+      data_scadenza_certificato_medico: t.data_scadenza_certificato_medico || '',
+      disabile: t.disabile || false,
       straniero: t.straniero || false, titolo_studio: t.titolo_studio || '',
       e_socio: t.e_socio, genitore_id: t.genitore_id || null,
     });
@@ -104,6 +127,17 @@ const Tesserati: React.FC = () => {
     setMostraDettaglio(t);
     const res = await getDocumenti(t.id);
     setDocumenti(res.data);
+    const resPag = await getPagamentiTesserato(t.id);
+    setPagamentiTesserato(resPag.data);
+  };
+
+  const handleIncassoTesserato = async (pagamentoId: number) => {
+    const metodo = window.prompt('Metodo di pagamento (contanti / bonifico / altro):', 'contanti');
+    if (metodo && ['contanti', 'bonifico', 'altro'].includes(metodo) && mostraDettaglio) {
+      await registraIncasso(pagamentoId, metodo);
+      const resPag = await getPagamentiTesserato(mostraDettaglio.id);
+      setPagamentiTesserato(resPag.data);
+    }
   };
 
   const handleSubmit = async () => {
@@ -219,6 +253,7 @@ Sei sicuro?`)) {
     if (filtroAnnoNascita && !t.data_nascita?.startsWith(filtroAnnoNascita)) return false;
     if (filtroCFTemp && !t.codice_fiscale?.startsWith('TEMP_')) return false;
     if (filtroTesseraScaduta && (!t.data_scadenza_tessera || t.data_scadenza_tessera >= oggi)) return false;
+    if (filtroCertificatoScaduto && (!t.data_scadenza_certificato_medico || t.data_scadenza_certificato_medico >= oggi)) return false;
     return true;
   });
 
@@ -297,6 +332,12 @@ Sei sicuro?`)) {
               Solo tessere scadute
             </label>
           </div>
+          <div className="flex items-center gap-2 col-span-2 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={filtroCertificatoScaduto} onChange={e => setFiltroCertificatoScaduto(e.target.checked)} />
+              <span className="text-red-600 font-medium">Solo certificati medici scaduti</span>
+            </label>
+          </div>
           <div className="col-span-2 md:col-span-4 flex items-center gap-2">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={mostraDisabilitati} onChange={e => setMostraDisabilitati(e.target.checked)} />
@@ -304,9 +345,9 @@ Sei sicuro?`)) {
             </label>
           </div>
 
-          {(filtroGruppo || filtroSport || filtroCategoria || filtroAnnoNascita || filtroCFTemp || filtroTesseraScaduta) && (
+          {(filtroGruppo || filtroSport || filtroCategoria || filtroAnnoNascita || filtroCFTemp || filtroTesseraScaduta || filtroCertificatoScaduto) && (
             <div className="col-span-2 md:col-span-4 flex justify-end">
-              <button onClick={() => { setFiltroGruppo(''); setFiltroSport(''); setFiltroCategoria(''); setFiltroAnnoNascita(''); setFiltroCFTemp(false); setFiltroTesseraScaduta(false); }}
+              <button onClick={() => { setFiltroGruppo(''); setFiltroSport(''); setFiltroCategoria(''); setFiltroAnnoNascita(''); setFiltroCFTemp(false); setFiltroTesseraScaduta(false); setFiltroCertificatoScaduto(false); }}
                 className="text-xs text-blue-600 hover:text-blue-800">
                 ✕ Rimuovi tutti i filtri ({filtrati.length} risultati)
               </button>
@@ -440,6 +481,13 @@ Sei sicuro?`)) {
                     {campo('Matricola', 'matricola')}
                     {campo('Data emissione', 'data_emissione_tessera', 'date')}
                     {campo('Data scadenza', 'data_scadenza_tessera', 'date')}
+                    <div className="col-span-2 text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3 mb-1">Certificato medico sportivo</div>
+                    <div>
+                      {campo('Scadenza certificato medico', 'data_scadenza_certificato_medico', 'date')}
+                      {form.data_scadenza_certificato_medico && (
+                        <BadgeScadenza data={form.data_scadenza_certificato_medico} />
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -569,6 +617,13 @@ Sei sicuro?`)) {
                         <p className="font-medium">{val as string}</p>
                       </div>
                     ) : null)}
+                    {mostraDettaglio.data_scadenza_certificato_medico && (
+                      <div>
+                        <span className="text-gray-500 text-xs">Scad. certificato medico</span>
+                        <p className="font-medium">{mostraDettaglio.data_scadenza_certificato_medico}</p>
+                        <BadgeScadenza data={mostraDettaglio.data_scadenza_certificato_medico} />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -625,6 +680,46 @@ Sei sicuro?`)) {
                       </button>
                     )}
                   </div>
+                </div>
+
+                {/* SCADENZE PAGAMENTI */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">💳 Scadenze pagamenti</h3>
+                  {pagamentiTesserato.length === 0 ? (
+                    <p className="text-gray-400 text-sm">Nessun pagamento associato a questo tesserato</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {pagamentiTesserato.map((p) => {
+                        const scaduto = !p.pagato && p.data_scadenza < new Date().toISOString().split('T')[0];
+                        return (
+                          <div key={p.id} className={`flex justify-between items-center rounded-lg px-3 py-2 text-sm ${
+                            p.pagato ? 'bg-green-50' : scaduto ? 'bg-red-50' : 'bg-yellow-50'
+                          }`}>
+                            <div>
+                              <span className="font-medium">{p.descrizione || `Tariffa #${p.tariffa_id}`}</span>
+                              <span className="text-gray-500 ml-2 text-xs">scad. {p.data_scadenza}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold">€ {Number(p.importo).toFixed(2)}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                p.pagato ? 'bg-green-100 text-green-700' : scaduto ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {p.pagato ? 'Pagato' : scaduto ? 'Scaduto' : 'In attesa'}
+                              </span>
+                              {!p.pagato && (
+                                <button onClick={() => handleIncassoTesserato(p.id)} className="text-green-600 hover:text-green-800 text-xs font-medium">
+                                  Incassa
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <a href="/pagamenti" className="inline-block mt-3 text-xs text-blue-600 hover:underline">
+                    Gestisci tutti i pagamenti nella sezione Contabilità →
+                  </a>
                 </div>
               </div>
             </div>
