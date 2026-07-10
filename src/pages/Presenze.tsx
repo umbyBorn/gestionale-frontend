@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getEventi, getGruppi, getTesserati, getPresenzeEvento, registraPresenza, creaEvento } from '../services/api';
+import { getEventi, getGruppi, getTesserati, getPresenzeEvento, registraPresenza, annullaAssenza, creaEvento } from '../services/api';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -66,18 +66,26 @@ const Presenze: React.FC = () => {
     }
   };
 
-  const togglePresenza = async (tesseratoId: number, presente: boolean) => {
+  // Regola: ogni tesserato è considerato presente di default all'evento.
+  // Si registra esplicitamente solo l'assenza; l'assenza resta modificabile
+  // (può essere annullata per tornare allo stato presente di default).
+  const segnaAssente = async (tesseratoId: number) => {
     if (!eventoSelezionato) return;
-    const existing = presenze.find(p => p.tesserato_id === tesseratoId);
-    await registraPresenza({ evento_id: eventoSelezionato.id, tesserato_id: tesseratoId, presente });
+    await registraPresenza({ evento_id: eventoSelezionato.id, tesserato_id: tesseratoId, presente: false });
     const res = await getPresenzeEvento(eventoSelezionato.id);
     setPresenze(res.data);
   };
 
-  const getPresenza = (tesseratoId: number) => {
-    const p = presenze.find(p => p.tesserato_id === tesseratoId);
-    return p ? p.presente : null;
+  const rimuoviAssenza = async (tesseratoId: number) => {
+    if (!eventoSelezionato) return;
+    try {
+      await annullaAssenza(eventoSelezionato.id, tesseratoId);
+    } catch { /* già assente di default, nessuna riga da rimuovere */ }
+    const res = await getPresenzeEvento(eventoSelezionato.id);
+    setPresenze(res.data);
   };
+
+  const isAssente = (tesseratoId: number) => presenze.some(p => p.tesserato_id === tesseratoId && p.presente === false);
 
   // Calendario
   const primoGiorno = new Date(anno, mese, 1);
@@ -123,7 +131,7 @@ const Presenze: React.FC = () => {
     const righe = tesseratiEvento.map(t => ({
       Cognome: t.cognome,
       Nome: t.nome,
-      Presenza: getPresenza(t.id) === true ? 'Presente' : getPresenza(t.id) === false ? 'Assente' : 'Non registrato'
+      Presenza: isAssente(t.id) ? 'Assente' : 'Presente'
     }));
     const ws = XLSX.utils.json_to_sheet(righe);
     const wb = XLSX.utils.book_new();
@@ -143,7 +151,7 @@ const Presenze: React.FC = () => {
     const righe = tesseratiEvento.map(t => [
       t.cognome,
       t.nome,
-      getPresenza(t.id) === true ? '✓ Presente' : getPresenza(t.id) === false ? '✗ Assente' : '-'
+      isAssente(t.id) ? '✗ Assente' : '✓ Presente'
     ]);
     autoTable(doc, {
       head: [['Cognome', 'Nome', 'Presenza']],
@@ -277,25 +285,34 @@ const Presenze: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 mb-3">
-                    {presenze.filter(p => p.presente).length} presenti · {presenze.filter(p => !p.presente).length} assenti · {tesseratiEvento.filter(t => !presenze.some(p => p.tesserato_id === t.id)).length} non registrati
+                    {tesseratiEvento.length - presenze.filter(p => p.presente === false).length} presenti · {presenze.filter(p => p.presente === false).length} assenti
+                    <span className="text-gray-400"> · tutti presenti di default, segna solo chi manca</span>
                   </div>
                   <div className="space-y-1 max-h-96 overflow-y-auto">
                     {[...tesseratiEvento].sort((a, b) => a.cognome.localeCompare(b.cognome)).map(t => {
-                      const presenza = getPresenza(t.id);
+                      const assente = isAssente(t.id);
                       return (
                         <div key={t.id} className="flex justify-between items-center py-1.5 border-b border-gray-50">
-                          <span className="text-sm text-gray-800">{t.cognome} {t.nome}</span>
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => togglePresenza(t.id, true)}
-                              className={`w-8 h-7 rounded text-xs font-bold ${presenza === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-green-100'}`}>
-                              ✓
-                            </button>
-                            <button
-                              onClick={() => togglePresenza(t.id, false)}
-                              className={`w-8 h-7 rounded text-xs font-bold ${presenza === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-red-100'}`}>
-                              ✗
-                            </button>
+                          <span className={`text-sm ${assente ? 'text-gray-400' : 'text-gray-800'}`}>{t.cognome} {t.nome}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium ${assente ? 'text-red-500' : 'text-green-600'}`}>
+                              {assente ? '✗ Assente' : '✓ Presente'}
+                            </span>
+                            {assente ? (
+                              <button
+                                onClick={() => rimuoviAssenza(t.id)}
+                                title="Annulla assenza, torna presente"
+                                className="px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700">
+                                Annulla
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => segnaAssente(t.id)}
+                                title="Segna assente"
+                                className="px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-600">
+                                Segna assente
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

@@ -22,7 +22,7 @@ interface Messaggio { id: number; intestazione: string; corpo: string; data_invi
 interface Pagamento { id: number; importo: number; data_scadenza: string; pagato: boolean; }
 interface Documento { id: number; tipo: string; nome_file: string; url: string; data_scadenza?: string; }
 interface Compagno { id: number; nome: string; cognome: string; foto_url?: string; categoria?: string; }
-interface Statistiche { totale_eventi: number; presenze: number; assenze: number; non_registrate: number; percentuale: number; streak: number; }
+interface Statistiche { totale_eventi: number; presenze: number; assenze: number; percentuale: number; streak: number; }
 interface Presenza { id: number; evento_id: number; presente: boolean; }
 
 const SEZIONI = [

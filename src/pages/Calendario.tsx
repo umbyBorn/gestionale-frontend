@@ -112,78 +112,125 @@ const Calendario: React.FC = () => {
 
   const formatData = (g: number) => `${anno}-${String(mese).padStart(2, '0')}-${String(g).padStart(2, '0')}`;
 
+  const eventiGiornoSelezionato = giornoSelezionato ? (calendario[giornoSelezionato] || []) : [];
+
   return (
-    <div className="bg-gray-100 min-h-full">
-      <main className="p-4">
-        {/* Navigazione mese */}
-        <div className="flex items-center justify-between mb-4 bg-white rounded-lg shadow px-4 py-3">
-          <button onClick={mesePrecedente} className="text-blue-700 font-bold text-xl px-2">‹</button>
-          <h2 className="text-lg font-bold text-gray-800">{MESI[mese - 1]} {anno}</h2>
-          <button onClick={meseSuccessivo} className="text-blue-700 font-bold text-xl px-2">›</button>
+    <div className="bg-gray-50 min-h-full">
+      <main className="p-6 max-w-6xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Attività</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Calendario allenamenti, partite e raduni</p>
+          </div>
+          <button onClick={() => setMostraFormRicorrente(true)} className="bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition w-fit">
+            + Nuovo evento ricorrente
+          </button>
         </div>
 
-        {/* Griglia calendario */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="grid grid-cols-7 bg-blue-800">
-            {GIORNI.map(g => (
-              <div key={g} className="text-center text-white text-xs font-medium py-2">{g}</div>
-            ))}
-          </div>
-          {loading ? (
-            <div className="p-8 text-center text-gray-400">Caricamento...</div>
-          ) : (
-            <div className="grid grid-cols-7">
-              {celle.map((giorno, i) => {
-                if (!giorno) return <div key={`empty-${i}`} className="border border-gray-100 min-h-16 bg-gray-50" />;
-                const dataStr = formatData(giorno);
-                const eventiGiorno = calendario[dataStr] || [];
-                const isOggi = dataStr === `${oggi.getFullYear()}-${String(oggi.getMonth() + 1).padStart(2, '0')}-${String(oggi.getDate()).padStart(2, '0')}`;
-                return (
-                  <div
-                    key={giorno}
-                    onClick={() => setGiornoSelezionato(giornoSelezionato === dataStr ? null : dataStr)}
-                    className={`border border-gray-100 min-h-16 p-1 cursor-pointer hover:bg-blue-50 transition ${isOggi ? 'bg-blue-50' : ''} ${giornoSelezionato === dataStr ? 'ring-2 ring-blue-500' : ''}`}
-                  >
-                    <div className={`text-xs font-medium mb-1 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-600'}`}>{giorno}</div>
-                    {eventiGiorno.slice(0, 2).map(e => (
-                      <div key={e.id} className={`text-xs px-1 rounded mb-0.5 truncate ${tipoColore[e.tipo] || 'bg-gray-100'}`}>
-                        {e.ora_inizio ? e.ora_inizio.slice(0, 5) + ' ' : ''}{e.titolo}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* CALENDARIO */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-4 bg-gradient-to-r from-blue-700 to-blue-900">
+              <button onClick={mesePrecedente} className="text-white/80 hover:text-white font-bold text-xl px-2">‹</button>
+              <h2 className="text-lg font-bold text-white">{MESI[mese - 1]} {anno}</h2>
+              <button onClick={meseSuccessivo} className="text-white/80 hover:text-white font-bold text-xl px-2">›</button>
+            </div>
+            <div className="p-4">
+              {loading ? (
+                <p className="text-gray-400 text-center py-8">Caricamento...</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {GIORNI.map(g => <div key={g} className="text-center text-xs font-semibold text-gray-500 py-1">{g}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {celle.map((giorno, i) => {
+                      if (!giorno) return <div key={`empty-${i}`} />;
+                      const dataStr = formatData(giorno);
+                      const eventiGiorno = calendario[dataStr] || [];
+                      const isOggi = dataStr === `${oggi.getFullYear()}-${String(oggi.getMonth() + 1).padStart(2, '0')}-${String(oggi.getDate()).padStart(2, '0')}`;
+                      const isSelezionato = dataStr === giornoSelezionato;
+                      return (
+                        <div
+                          key={giorno}
+                          onClick={() => setGiornoSelezionato(giornoSelezionato === dataStr ? null : dataStr)}
+                          className={`min-h-[64px] p-1 rounded-lg cursor-pointer border transition ${
+                            isSelezionato ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' :
+                            isOggi ? 'border-blue-300 bg-blue-50' :
+                            'border-gray-100 hover:border-blue-200 hover:bg-blue-50/50'
+                          }`}
+                        >
+                          <div className={`text-xs font-medium mb-1 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
+                          {eventiGiorno.slice(0, 2).map(e => (
+                            <div key={e.id} className={`text-xs px-1 rounded mb-0.5 truncate ${tipoColore[e.tipo] || 'bg-gray-100'}`}>
+                              {e.ora_inizio ? e.ora_inizio.slice(0, 5) + ' ' : ''}{e.titolo}
+                            </div>
+                          ))}
+                          {eventiGiorno.length > 2 && (
+                            <div className="text-xs text-gray-400">+{eventiGiorno.length - 2}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-4 mt-4 text-xs text-gray-500 flex-wrap">
+                    {Object.entries(tipoColore).map(([tipo, colore]) => (
+                      <div key={tipo} className="flex items-center gap-1">
+                        <div className={`w-3 h-3 rounded ${colore.split(' ')[0]}`} />
+                        <span className="capitalize">{tipo}</span>
                       </div>
                     ))}
-                    {eventiGiorno.length > 2 && (
-                      <div className="text-xs text-gray-400">+{eventiGiorno.length - 2} altri</div>
-                    )}
                   </div>
-                );
-              })}
+                </>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Dettaglio giorno selezionato */}
-        {giornoSelezionato && calendario[giornoSelezionato] && (
-          <div className="mt-4 bg-white rounded-lg shadow p-4">
-            <h3 className="font-bold text-gray-800 mb-3">{giornoSelezionato}</h3>
-            {(calendario[giornoSelezionato] || []).map(e => (
-              <div key={e.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                <div>
-                  <span className={`text-xs px-2 py-0.5 rounded mr-2 ${tipoColore[e.tipo]}`}>{e.tipo}</span>
-                  <span className="font-medium text-gray-800">{e.titolo}</span>
-                  {e.ora_inizio && <span className="text-sm text-gray-500 ml-2">{e.ora_inizio.slice(0, 5)}</span>}
-                  <div className="text-xs text-gray-400 mt-1">{nomeGruppo(e.gruppo_id)} {e.luogo ? `• ${e.luogo}` : ''}</div>
-                </div>
-                <button onClick={() => handleEliminaOccorrenza(e.id)} className="text-red-500 hover:text-red-700 text-xs ml-4">
-                  Elimina
-                </button>
-              </div>
-            ))}
           </div>
-        )}
+
+          {/* PANNELLO LATERALE: dettaglio giorno */}
+          <div className="space-y-4">
+            {giornoSelezionato ? (
+              <div className="bg-white rounded-2xl shadow-sm p-4">
+                <h3 className="font-bold text-gray-800 mb-3 text-sm">
+                  {new Date(giornoSelezionato + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </h3>
+                {eventiGiornoSelezionato.length === 0 ? (
+                  <p className="text-gray-400 text-sm">Nessun evento in questo giorno</p>
+                ) : (
+                  <div className="space-y-2">
+                    {eventiGiornoSelezionato.map(e => (
+                      <div key={e.id} className="p-3 rounded-lg border-l-4 border-blue-300 bg-gray-50">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <p className="font-medium text-sm text-gray-800">{e.titolo}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {e.ora_inizio ? e.ora_inizio.slice(0, 5) : ''} {e.luogo ? `· ${e.luogo}` : ''}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">{nomeGruppo(e.gruppo_id)}</p>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${tipoColore[e.tipo]}`}>{e.tipo}</span>
+                        </div>
+                        <button onClick={() => handleEliminaOccorrenza(e.id)} className="text-red-500 hover:text-red-700 text-xs mt-2">
+                          Elimina occorrenza
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
+                <p className="text-gray-300 text-3xl mb-1">📅</p>
+                <p className="text-gray-400 text-sm">Seleziona un giorno per vedere gli eventi</p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Form evento ricorrente */}
         {mostraFormRicorrente && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-screen overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-screen overflow-y-auto">
               <h2 className="text-lg font-bold text-gray-800 mb-4">Nuovo Evento Ricorrente</h2>
               <div className="space-y-4">
                 <div>

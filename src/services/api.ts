@@ -198,3 +198,4 @@ export const getCompagniGruppo = (tesseratoId: number) => api.get(`/tesserati/${
 export const getStatisticheTesserato = (tesseratoId: number) => api.get(`/tesserati/${tesseratoId}/statistiche`);
 export const getPresenzeTesserato = (tesseratoId: number) => api.get(`/tesserati/${tesseratoId}/presenze`);
 export const aggiornaPresenza = (presenzaId: number, data: any) => api.put(`/presenze/${presenzaId}`, data);
+export const annullaAssenza = (eventoId: number, tesseratoId: number) => api.delete(`/eventi/${eventoId}/presenze/${tesseratoId}`);
