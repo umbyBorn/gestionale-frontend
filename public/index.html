@@ -18,7 +18,18 @@
     <noscript>Abilita JavaScript per usare questa applicazione.</noscript>
     <div id="root"></div>
   <script>
-    if ("serviceWorker" in navigator) {
+    // In modalità locale/offline (l'app gira su 127.0.0.1) il service worker
+    // non serve ed è anzi dannoso: intercetta le chiamate verso il server
+    // locale e va in errore. Qui NON arrivano le variabili REACT_APP_*
+    // (questo script non passa dal build di React), quindi il controllo è
+    // sull'indirizzo a runtime.
+    if (location.hostname === "127.0.0.1") {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((r) => r.unregister());
+        });
+      }
+    } else if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("/service-worker.js")
           .then(r => console.log("SW registrato"))
