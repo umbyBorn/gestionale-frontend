@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = 'https://gestionale-sport-api.onrender.com';
+// In produzione (Render) punta all'API online. Nella build locale/offline
+// (vedi local_app/) viene sovrascritta a build-time con REACT_APP_API_URL
+// impostata su http://127.0.0.1:<porta locale>.
+const API_URL = process.env.REACT_APP_API_URL || 'https://gestionale-sport-api.onrender.com';
 
 const api = axios.create({
   baseURL: API_URL,

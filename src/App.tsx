@@ -19,6 +19,7 @@ import Iscrizioni from './pages/Iscrizioni';
 import Importazione from './pages/Importazione';
 import PrimaNota from './pages/PrimaNota';
 import Rendiconto from './pages/Rendiconto';
+import Sincronizza from './pages/Sincronizza';
 
 const RouteGuard: React.FC<{ children: React.ReactNode; titolo?: string; sezione?: string; soloAdmin?: boolean }> = ({
   children, titolo, sezione, soloAdmin
@@ -57,6 +58,9 @@ const App: React.FC = () => {
           <Route path="/messaggi" element={<RouteGuard titolo="Messaggi" sezione="messaggi"><Messaggi /></RouteGuard>} />
           <Route path="/prima-nota" element={<RouteGuard titolo="Prima nota" sezione="pagamenti"><PrimaNota /></RouteGuard>} />
           <Route path="/rendiconto" element={<RouteGuard titolo="Rendiconto" sezione="pagamenti"><Rendiconto /></RouteGuard>} />
+          {process.env.REACT_APP_LOCALE === 'true' && (
+            <Route path="/sincronizza" element={<RouteGuard titolo="Sincronizza"><Sincronizza /></RouteGuard>} />
+          )}
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
           <Route path="/iscrizioni" element={<RouteGuard titolo="Iscrizioni online"><Iscrizioni /></RouteGuard>} />
           <Route path="/iscriviti/:token" element={<FormIscrizione />} />

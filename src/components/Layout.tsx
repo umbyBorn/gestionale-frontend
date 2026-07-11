@@ -86,6 +86,12 @@ const MENU: VoceMenu[] = [
       { label: 'Utenti e permessi', path: '/admin' },
     ],
   },
+  ...(process.env.REACT_APP_LOCALE === 'true' ? [{
+    id: 'sincronizza',
+    label: 'Sincronizza',
+    icona: '🔄',
+    path: '/sincronizza',
+  }] : []),
 ];
 
 interface LayoutProps {

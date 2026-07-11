@@ -173,10 +173,10 @@ const Presenze: React.FC = () => {
           <p className="text-sm text-gray-500 mt-0.5">Registra le presenze agli allenamenti e agli eventi</p>
         </div>
         {loading ? <p className="text-gray-500">Caricamento...</p> : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
             {/* CALENDARIO */}
-            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
               <div className="flex justify-between items-center px-5 py-4 bg-gradient-to-r from-blue-700 to-blue-900">
                 <button onClick={mesePrecedente} className="text-white/80 hover:text-white font-bold text-xl px-2">‹</button>
                 <h2 className="text-lg font-bold text-white">{MESI[mese]} {anno}</h2>
@@ -190,7 +190,7 @@ const Presenze: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1.5">
                   {Array.from({ length: offsetInizio }).map((_, i) => <div key={`empty-${i}`} />)}
                   {Array.from({ length: ultimoGiorno.getDate() }).map((_, i) => {
                     const giorno = i + 1;
@@ -201,18 +201,20 @@ const Presenze: React.FC = () => {
                     return (
                       <div key={giorno}
                         onClick={() => { setGiornoSelezionato(dataStr); setEventoSelezionato(null); }}
-                        className={`min-h-[64px] p-1 rounded-lg cursor-pointer border transition ${
+                        className={`min-h-[110px] sm:min-h-[130px] p-1.5 rounded-lg cursor-pointer border transition flex flex-col ${
                           isSelezionato ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' :
                           isOggi ? 'border-blue-300 bg-blue-50' :
                           'border-gray-100 hover:border-blue-200 hover:bg-blue-50/50'
                         }`}>
-                        <div className={`text-xs font-medium mb-1 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
-                        {eventiGiorno.slice(0, 3).map(e => (
-                          <div key={e.id} className={`text-white text-xs rounded px-1 mb-0.5 truncate ${tipoColore[e.tipo] || 'bg-gray-500'}`}>
-                            {e.ora_inizio ? e.ora_inizio.substring(0,5) : ''} {e.titolo}
-                          </div>
-                        ))}
-                        {eventiGiorno.length > 3 && <div className="text-xs text-gray-400">+{eventiGiorno.length - 3}</div>}
+                        <div className={`text-xs font-medium mb-1 flex-shrink-0 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
+                        <div className="space-y-0.5 overflow-hidden">
+                          {eventiGiorno.slice(0, 3).map(e => (
+                            <div key={e.id} className={`text-white text-[11px] leading-tight rounded px-1 py-0.5 break-words ${tipoColore[e.tipo] || 'bg-gray-500'}`}>
+                              {e.ora_inizio ? <span className="font-semibold">{e.ora_inizio.substring(0,5)} </span> : ''}{e.titolo}
+                            </div>
+                          ))}
+                          {eventiGiorno.length > 3 && <div className="text-[11px] text-gray-400 px-1">+{eventiGiorno.length - 3}</div>}
+                        </div>
                       </div>
                     );
                   })}

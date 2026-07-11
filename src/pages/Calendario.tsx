@@ -127,10 +127,10 @@ const Calendario: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
           {/* CALENDARIO */}
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="flex justify-between items-center px-5 py-4 bg-gradient-to-r from-blue-700 to-blue-900">
               <button onClick={mesePrecedente} className="text-white/80 hover:text-white font-bold text-xl px-2">‹</button>
               <h2 className="text-lg font-bold text-white">{MESI[mese - 1]} {anno}</h2>
@@ -141,10 +141,10 @@ const Calendario: React.FC = () => {
                 <p className="text-gray-400 text-center py-8">Caricamento...</p>
               ) : (
                 <>
-                  <div className="grid grid-cols-7 gap-1 mb-2">
+                  <div className="grid grid-cols-7 gap-1.5 mb-2">
                     {GIORNI.map(g => <div key={g} className="text-center text-xs font-semibold text-gray-500 py-1">{g}</div>)}
                   </div>
-                  <div className="grid grid-cols-7 gap-1">
+                  <div className="grid grid-cols-7 gap-1.5">
                     {celle.map((giorno, i) => {
                       if (!giorno) return <div key={`empty-${i}`} />;
                       const dataStr = formatData(giorno);
@@ -155,21 +155,23 @@ const Calendario: React.FC = () => {
                         <div
                           key={giorno}
                           onClick={() => setGiornoSelezionato(giornoSelezionato === dataStr ? null : dataStr)}
-                          className={`min-h-[64px] p-1 rounded-lg cursor-pointer border transition ${
+                          className={`min-h-[110px] sm:min-h-[130px] p-1.5 rounded-lg cursor-pointer border transition flex flex-col ${
                             isSelezionato ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' :
                             isOggi ? 'border-blue-300 bg-blue-50' :
                             'border-gray-100 hover:border-blue-200 hover:bg-blue-50/50'
                           }`}
                         >
-                          <div className={`text-xs font-medium mb-1 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
-                          {eventiGiorno.slice(0, 2).map(e => (
-                            <div key={e.id} className={`text-xs px-1 rounded mb-0.5 truncate ${tipoColore[e.tipo] || 'bg-gray-100'}`}>
-                              {e.ora_inizio ? e.ora_inizio.slice(0, 5) + ' ' : ''}{e.titolo}
-                            </div>
-                          ))}
-                          {eventiGiorno.length > 2 && (
-                            <div className="text-xs text-gray-400">+{eventiGiorno.length - 2}</div>
-                          )}
+                          <div className={`text-xs font-medium mb-1 flex-shrink-0 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
+                          <div className="space-y-0.5 overflow-hidden">
+                            {eventiGiorno.slice(0, 3).map(e => (
+                              <div key={e.id} className={`text-[11px] leading-tight px-1 py-0.5 rounded break-words ${tipoColore[e.tipo] || 'bg-gray-100'}`}>
+                                {e.ora_inizio ? <span className="font-semibold">{e.ora_inizio.slice(0, 5)} </span> : ''}{e.titolo}
+                              </div>
+                            ))}
+                            {eventiGiorno.length > 3 && (
+                              <div className="text-[11px] text-gray-400 px-1">+{eventiGiorno.length - 3} altri</div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
