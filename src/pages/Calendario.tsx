@@ -109,18 +109,26 @@ const Calendario: React.FC = () => {
   const giorniNelMese = () => new Date(anno, mese, 0).getDate();
 
   const handleCreaRicorrente = async () => {
-    await creaEventoRicorrente({ ...form, giorni_settimana: form.giorni_settimana });
-    setMostraFormRicorrente(false);
-    setForm({ gruppo_id: 0, tipo: 'allenamento', titolo: '', ora_inizio: '', ora_fine: '', luogo: '', giorni_settimana: [], data_inizio: '', data_fine: '' });
-    carica();
+    try {
+      await creaEventoRicorrente({ ...form, giorni_settimana: form.giorni_settimana });
+      setMostraFormRicorrente(false);
+      setForm({ gruppo_id: 0, tipo: 'allenamento', titolo: '', ora_inizio: '', ora_fine: '', luogo: '', giorni_settimana: [], data_inizio: '', data_fine: '' });
+      carica();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore durante la creazione dell\'evento ricorrente');
+    }
   };
 
   const handleEliminaOccorrenza = async (eventoId: number) => {
     if (!window.confirm('Eliminare questa singola occorrenza?')) return;
-    await eliminaOccorrenza(eventoId);
-    carica();
-    setGiornoSelezionato(null);
-    setEventoAzione(null);
+    try {
+      await eliminaOccorrenza(eventoId);
+      carica();
+      setGiornoSelezionato(null);
+      setEventoAzione(null);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione dell\'evento');
+    }
   };
 
   const apriModificaBlocco = (e: EventoCalendario) => {
@@ -131,18 +139,22 @@ const Calendario: React.FC = () => {
 
   const handleSalvaModificaBlocco = async () => {
     if (!eventoRicorrenteAzione?.ricorrente_id) return;
-    const res = await modificaEventoRicorrente(eventoRicorrenteAzione.ricorrente_id, {
-      titolo: formModificaBlocco.titolo,
-      ora_inizio: formModificaBlocco.ora_inizio || null,
-      ora_fine: formModificaBlocco.ora_fine || null,
-      luogo: formModificaBlocco.luogo,
-      solo_futuri: true,
-    });
-    setMostraFormModificaBlocco(false);
-    setEventoRicorrenteAzione(null);
-    setGiornoSelezionato(null);
-    carica();
-    alert(res.data?.messaggio || 'Occorrenze future aggiornate');
+    try {
+      const res = await modificaEventoRicorrente(eventoRicorrenteAzione.ricorrente_id, {
+        titolo: formModificaBlocco.titolo,
+        ora_inizio: formModificaBlocco.ora_inizio || null,
+        ora_fine: formModificaBlocco.ora_fine || null,
+        luogo: formModificaBlocco.luogo,
+        solo_futuri: true,
+      });
+      setMostraFormModificaBlocco(false);
+      setEventoRicorrenteAzione(null);
+      setGiornoSelezionato(null);
+      carica();
+      alert(res.data?.messaggio || 'Occorrenze future aggiornate');
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore durante la modifica in blocco');
+    }
   };
 
   const handleEliminaSerieFutura = async (e: EventoCalendario) => {
@@ -152,10 +164,16 @@ const Calendario: React.FC = () => {
       'Le occorrenze passate (già svolte, con eventuali presenze registrate) NON verranno toccate.\n\n' +
       'Vuoi continuare?'
     )) return;
-    await eliminaEventoRicorrente(e.ricorrente_id, true);
-    setGiornoSelezionato(null);
-    setEventoAzione(null);
-    carica();
+    try {
+      const res = await eliminaEventoRicorrente(e.ricorrente_id, true);
+      setGiornoSelezionato(null);
+      setEventoAzione(null);
+      carica();
+      const n = res.data?.occorrenze_eliminate;
+      if (typeof n === 'number') alert(`Eliminate ${n} occorrenze future.`);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione della serie di eventi');
+    }
   };
 
   /** Trova l'oggetto evento completo (con data/ora_fine) a partire dal solo id,
@@ -176,19 +194,23 @@ const Calendario: React.FC = () => {
 
   const handleSalvaModificaSingola = async () => {
     if (!eventoAzione) return;
-    await modificaEvento(eventoAzione.id, {
-      titolo: formModificaSingola.titolo,
-      tipo: formModificaSingola.tipo,
-      gruppo_id: formModificaSingola.gruppo_id,
-      data: formModificaSingola.data,
-      ora_inizio: formModificaSingola.ora_inizio || null,
-      ora_fine: formModificaSingola.ora_fine || null,
-      luogo: formModificaSingola.luogo,
-    });
-    setMostraFormModificaSingola(false);
-    setEventoAzione(null);
-    setGiornoSelezionato(null);
-    carica();
+    try {
+      await modificaEvento(eventoAzione.id, {
+        titolo: formModificaSingola.titolo,
+        tipo: formModificaSingola.tipo,
+        gruppo_id: formModificaSingola.gruppo_id,
+        data: formModificaSingola.data,
+        ora_inizio: formModificaSingola.ora_inizio || null,
+        ora_fine: formModificaSingola.ora_fine || null,
+        luogo: formModificaSingola.luogo,
+      });
+      setMostraFormModificaSingola(false);
+      setEventoAzione(null);
+      setGiornoSelezionato(null);
+      carica();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore durante la modifica dell\'evento');
+    }
   };
 
   const toggleGiorno = (g: number) => {
@@ -234,130 +256,130 @@ const Calendario: React.FC = () => {
           </button>
         </div>
 
-        {/* COMBO: cerca un evento esistente e agisci direttamente, senza dover cliccare sul giorno */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">🔍 Trova un evento e modificalo o eliminalo</h3>
-          <input
-            type="text"
-            value={ricercaEvento}
-            onChange={(e) => setRicercaEvento(e.target.value)}
-            placeholder="Cerca per titolo o gruppo... (di default mostra i prossimi eventi)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <div className="max-h-56 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-lg">
-            {eventiFiltrati.length === 0 ? (
-              <p className="text-gray-400 text-sm p-3">Nessun evento trovato</p>
-            ) : eventiFiltrati.map(e => (
-              <button
-                key={e.id}
-                onClick={() => setEventoAzione(eventoAzione?.id === e.id ? null : e)}
-                className={`w-full text-left px-3 py-2 flex items-center justify-between gap-3 hover:bg-blue-50 transition ${eventoAzione?.id === e.id ? 'bg-blue-50' : ''}`}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">
-                    {e.titolo} {e.ricorrente_id && <span className="text-gray-400" title="Serie ricorrente">🔁</span>}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {formatDate(e.data)} {e.ora_inizio ? `· ${e.ora_inizio.slice(0, 5)}` : ''} · {nomeGruppo(e.gruppo_id)}
-                  </p>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${tipoColore[e.tipo]}`}>{e.tipo}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Pannello azioni per l'evento selezionato dalla combo */}
-          {eventoAzione && (
-            <div className="mt-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
-              <p className="text-sm font-medium text-gray-800 mb-2">
-                Azioni per "{eventoAzione.titolo}" — {formatDate(eventoAzione.data)}
-              </p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                <button onClick={() => apriModificaSingola(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                  ✏️ Modifica questo evento
-                </button>
-                <button onClick={() => handleEliminaOccorrenza(eventoAzione.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
-                  🗑 Elimina solo questo
-                </button>
-                {eventoAzione.ricorrente_id && (
-                  <>
-                    <button onClick={() => apriModificaBlocco(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                      ✏️ Modifica questa e le successive
-                    </button>
-                    <button onClick={() => handleEliminaSerieFutura(eventoAzione)} className="text-red-600 hover:text-red-800 text-xs font-medium">
-                      🗑 Elimina questa e le successive
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
           {/* CALENDARIO */}
           <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="flex justify-between items-center px-5 py-4 bg-gradient-to-r from-blue-700 to-blue-900">
-              <button onClick={mesePrecedente} className="text-white/80 hover:text-white font-bold text-xl px-2">‹</button>
-              <h2 className="text-lg font-bold text-white">{MESI[mese - 1]} {anno}</h2>
-              <button onClick={meseSuccessivo} className="text-white/80 hover:text-white font-bold text-xl px-2">›</button>
-            </div>
-            <div className="p-4">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-4">
+              <div className="flex justify-between items-center mb-4">
+                <button onClick={mesePrecedente} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 text-white">◀</button>
+                <h2 className="font-bold text-lg text-white">{MESI[mese - 1]} {anno}</h2>
+                <button onClick={meseSuccessivo} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 text-white">▶</button>
+              </div>
               {loading ? (
-                <p className="text-gray-400 text-center py-8">Caricamento...</p>
+                <p className="text-blue-100 text-center py-8">Caricamento...</p>
               ) : (
                 <>
-                  <div className="grid grid-cols-7 gap-1.5 mb-2">
-                    {GIORNI.map(g => <div key={g} className="text-center text-xs font-semibold text-gray-500 py-1">{g}</div>)}
+                  <div className="grid grid-cols-7 mb-2">
+                    {GIORNI.map(g => <div key={g} className="text-center text-xs text-blue-200 font-medium py-1">{g}</div>)}
                   </div>
-                  <div className="grid grid-cols-7 gap-1.5">
+                  <div className="grid grid-cols-7 gap-1">
                     {celle.map((giorno, i) => {
                       if (!giorno) return <div key={`empty-${i}`} />;
                       const dataStr = formatData(giorno);
                       const eventiGiorno = calendario[dataStr] || [];
                       const isOggi = dataStr === `${oggi.getFullYear()}-${String(oggi.getMonth() + 1).padStart(2, '0')}-${String(oggi.getDate()).padStart(2, '0')}`;
                       const isSelezionato = dataStr === giornoSelezionato;
+                      const haEventi = eventiGiorno.length > 0;
                       return (
-                        <div
+                        <button
                           key={giorno}
                           onClick={() => setGiornoSelezionato(giornoSelezionato === dataStr ? null : dataStr)}
-                          className={`min-h-[110px] sm:min-h-[130px] p-1.5 rounded-lg cursor-pointer border transition flex flex-col ${
-                            isSelezionato ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' :
-                            isOggi ? 'border-blue-300 bg-blue-50' :
-                            'border-gray-100 hover:border-blue-200 hover:bg-blue-50/50'
+                          className={`aspect-square rounded-xl flex flex-col items-center justify-center transition ${
+                            isSelezionato ? 'bg-white text-blue-700 shadow-lg scale-110' :
+                            isOggi ? 'bg-white/30 text-white font-bold' :
+                            haEventi ? 'bg-white/10 text-white hover:bg-white/20' :
+                            'text-blue-100 hover:bg-white/10'
                           }`}
                         >
-                          <div className={`text-xs font-medium mb-1 flex-shrink-0 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
-                          <div className="space-y-0.5 overflow-hidden">
-                            {eventiGiorno.slice(0, 3).map(e => (
-                              <div key={e.id} className={`text-[11px] leading-tight px-1 py-0.5 rounded break-words ${tipoColore[e.tipo] || 'bg-gray-100'}`}>
-                                {e.ora_inizio ? <span className="font-semibold">{e.ora_inizio.slice(0, 5)} </span> : ''}{e.titolo}
-                              </div>
-                            ))}
-                            {eventiGiorno.length > 3 && (
-                              <div className="text-[11px] text-gray-400 px-1">+{eventiGiorno.length - 3} altri</div>
-                            )}
-                          </div>
-                        </div>
+                          <span className="text-sm font-semibold">{giorno}</span>
+                          {haEventi && (
+                            <span className="flex gap-0.5 mt-0.5">
+                              {eventiGiorno.slice(0, 3).map((e, idx) => (
+                                <span key={idx} className={`w-1.5 h-1.5 rounded-full ${isSelezionato ? tipoColore[e.tipo]?.split(' ')[0] || 'bg-blue-400' : 'bg-yellow-300'}`} />
+                              ))}
+                            </span>
+                          )}
+                        </button>
                       );
                     })}
-                  </div>
-                  <div className="flex gap-4 mt-4 text-xs text-gray-500 flex-wrap">
-                    {Object.entries(tipoColore).map(([tipo, colore]) => (
-                      <div key={tipo} className="flex items-center gap-1">
-                        <div className={`w-3 h-3 rounded ${colore.split(' ')[0]}`} />
-                        <span className="capitalize">{tipo}</span>
-                      </div>
-                    ))}
                   </div>
                 </>
               )}
             </div>
+            <div className="flex gap-4 px-4 py-3 text-xs text-gray-500 flex-wrap border-t">
+              {Object.entries(tipoColore).map(([tipo, colore]) => (
+                <div key={tipo} className="flex items-center gap-1">
+                  <div className={`w-3 h-3 rounded ${colore.split(' ')[0]}`} />
+                  <span className="capitalize">{tipo}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* PANNELLO LATERALE: dettaglio giorno */}
+          {/* PANNELLO LATERALE: ricerca eventi + dettaglio giorno */}
           <div className="space-y-4">
+
+            {/* COMBO: cerca un evento esistente e agisci direttamente, senza dover cliccare sul giorno */}
+            <div className="bg-white rounded-2xl shadow-sm p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">🔍 Trova un evento</h3>
+              <input
+                type="text"
+                value={ricercaEvento}
+                onChange={(e) => setRicercaEvento(e.target.value)}
+                placeholder="Cerca per titolo o gruppo..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="max-h-40 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-lg">
+                {eventiFiltrati.length === 0 ? (
+                  <p className="text-gray-400 text-xs p-2">Nessun evento trovato</p>
+                ) : eventiFiltrati.map(e => (
+                  <button
+                    key={e.id}
+                    onClick={() => setEventoAzione(eventoAzione?.id === e.id ? null : e)}
+                    className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between gap-2 hover:bg-blue-50 transition ${eventoAzione?.id === e.id ? 'bg-blue-50' : ''}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-800 truncate">
+                        {e.titolo} {e.ricorrente_id && <span className="text-gray-400" title="Serie ricorrente">🔁</span>}
+                      </p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {formatDate(e.data)} {e.ora_inizio ? `· ${e.ora_inizio.slice(0, 5)}` : ''} · {nomeGruppo(e.gruppo_id)}
+                      </p>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${tipoColore[e.tipo]}`}>{e.tipo}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Pannello azioni per l'evento selezionato dalla combo */}
+              {eventoAzione && (
+                <div className="mt-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                  <p className="text-xs font-medium text-gray-800 mb-2">
+                    "{eventoAzione.titolo}" — {formatDate(eventoAzione.data)}
+                  </p>
+                  <div className="flex flex-col items-start gap-1">
+                    <button onClick={() => apriModificaSingola(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                      ✏️ Modifica questo evento
+                    </button>
+                    <button onClick={() => handleEliminaOccorrenza(eventoAzione.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                      🗑 Elimina solo questo
+                    </button>
+                    {eventoAzione.ricorrente_id && (
+                      <>
+                        <button onClick={() => apriModificaBlocco(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                          ✏️ Modifica questa e le successive
+                        </button>
+                        <button onClick={() => handleEliminaSerieFutura(eventoAzione)} className="text-red-600 hover:text-red-800 text-xs font-medium">
+                          🗑 Elimina questa e le successive
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {giornoSelezionato ? (
               <div className="bg-white rounded-2xl shadow-sm p-4">
                 <h3 className="font-bold text-gray-800 mb-3 text-sm">

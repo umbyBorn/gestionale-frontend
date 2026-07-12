@@ -344,26 +344,20 @@ Sei sicuro?`)) {
               {anniDisponibili.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
-          <div className="flex items-center gap-2 col-span-2 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <div className="col-span-2 md:col-span-4 flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input type="checkbox" checked={filtroCFTemp} onChange={e => setFiltroCFTemp(e.target.checked)} />
               Solo CF temporanei da completare
             </label>
-          </div>
-          <div className="flex items-center gap-2 col-span-2 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input type="checkbox" checked={filtroTesseraScaduta} onChange={e => setFiltroTesseraScaduta(e.target.checked)} />
               Solo tessere scadute
             </label>
-          </div>
-          <div className="flex items-center gap-2 col-span-2 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input type="checkbox" checked={filtroCertificatoScaduto} onChange={e => setFiltroCertificatoScaduto(e.target.checked)} />
               <span className="text-red-600 font-medium">Solo certificati medici scaduti</span>
             </label>
-          </div>
-          <div className="col-span-2 md:col-span-4 flex items-center gap-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input type="checkbox" checked={mostraDisabilitati} onChange={e => setMostraDisabilitati(e.target.checked)} />
               <span className="text-orange-600 font-medium">Mostra tesserati disabilitati</span>
             </label>

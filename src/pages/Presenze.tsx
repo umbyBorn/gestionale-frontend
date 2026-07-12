@@ -178,20 +178,18 @@ const Presenze: React.FC = () => {
 
             {/* CALENDARIO */}
             <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex justify-between items-center px-5 py-4 bg-gradient-to-r from-blue-700 to-blue-900">
-                <button onClick={mesePrecedente} className="text-white/80 hover:text-white font-bold text-xl px-2">‹</button>
-                <h2 className="text-lg font-bold text-white">{MESI[mese]} {anno}</h2>
-                <button onClick={meseSuccessivo} className="text-white/80 hover:text-white font-bold text-xl px-2">›</button>
-              </div>
-
-              <div className="p-4">
-                <div className="grid grid-cols-7 gap-1 mb-2">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <button onClick={mesePrecedente} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 text-white">◀</button>
+                  <h2 className="font-bold text-lg text-white">{MESI[mese]} {anno}</h2>
+                  <button onClick={meseSuccessivo} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 text-white">▶</button>
+                </div>
+                <div className="grid grid-cols-7 mb-2">
                   {GIORNI.map(g => (
-                    <div key={g} className="text-center text-xs font-semibold text-gray-500 py-1">{g}</div>
+                    <div key={g} className="text-center text-xs text-blue-200 font-medium py-1">{g}</div>
                   ))}
                 </div>
-
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-7 gap-1">
                   {Array.from({ length: offsetInizio }).map((_, i) => <div key={`empty-${i}`} />)}
                   {Array.from({ length: ultimoGiorno.getDate() }).map((_, i) => {
                     const giorno = i + 1;
@@ -199,37 +197,38 @@ const Presenze: React.FC = () => {
                     const eventiGiorno = eventiDelGiorno(giorno);
                     const isOggi = dataStr === oggi.toISOString().split('T')[0];
                     const isSelezionato = dataStr === giornoSelezionato;
+                    const haEventi = eventiGiorno.length > 0;
                     return (
-                      <div key={giorno}
+                      <button key={giorno}
                         onClick={() => { setGiornoSelezionato(dataStr); setEventoSelezionato(null); }}
-                        className={`min-h-[110px] sm:min-h-[130px] p-1.5 rounded-lg cursor-pointer border transition flex flex-col ${
-                          isSelezionato ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' :
-                          isOggi ? 'border-blue-300 bg-blue-50' :
-                          'border-gray-100 hover:border-blue-200 hover:bg-blue-50/50'
+                        className={`aspect-square rounded-xl flex flex-col items-center justify-center transition ${
+                          isSelezionato ? 'bg-white text-blue-700 shadow-lg scale-110' :
+                          isOggi ? 'bg-white/30 text-white font-bold' :
+                          haEventi ? 'bg-white/10 text-white hover:bg-white/20' :
+                          'text-blue-100 hover:bg-white/10'
                         }`}>
-                        <div className={`text-xs font-medium mb-1 flex-shrink-0 ${isOggi ? 'text-blue-700 font-bold' : 'text-gray-700'}`}>{giorno}</div>
-                        <div className="space-y-0.5 overflow-hidden">
-                          {eventiGiorno.slice(0, 3).map(e => (
-                            <div key={e.id} className={`text-white text-[11px] leading-tight rounded px-1 py-0.5 break-words ${tipoColore[e.tipo] || 'bg-gray-500'}`}>
-                              {e.ora_inizio ? <span className="font-semibold">{e.ora_inizio.substring(0,5)} </span> : ''}{e.titolo}
-                            </div>
-                          ))}
-                          {eventiGiorno.length > 3 && <div className="text-[11px] text-gray-400 px-1">+{eventiGiorno.length - 3}</div>}
-                        </div>
-                      </div>
+                        <span className="text-sm font-semibold">{giorno}</span>
+                        {haEventi && (
+                          <span className="flex gap-0.5 mt-0.5">
+                            {eventiGiorno.slice(0, 3).map((e, idx) => (
+                              <span key={idx} className={`w-1.5 h-1.5 rounded-full ${isSelezionato ? (tipoColore[e.tipo] || 'bg-blue-400') : 'bg-yellow-300'}`} />
+                            ))}
+                          </span>
+                        )}
+                      </button>
                     );
                   })}
                 </div>
+              </div>
 
-                {/* Legenda */}
-                <div className="flex gap-4 mt-4 text-xs text-gray-500">
-                  {Object.entries(tipoColore).map(([tipo, colore]) => (
-                    <div key={tipo} className="flex items-center gap-1">
-                      <div className={`w-3 h-3 rounded ${colore}`} />
-                      <span className="capitalize">{tipo}</span>
-                    </div>
-                  ))}
-                </div>
+              {/* Legenda */}
+              <div className="flex gap-4 px-4 py-3 text-xs text-gray-500 flex-wrap border-t">
+                {Object.entries(tipoColore).map(([tipo, colore]) => (
+                  <div key={tipo} className="flex items-center gap-1">
+                    <div className={`w-3 h-3 rounded ${colore}`} />
+                    <span className="capitalize">{tipo}</span>
+                  </div>
+                ))}
               </div>
             </div>
 

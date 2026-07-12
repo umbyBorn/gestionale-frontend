@@ -95,7 +95,12 @@ const Gruppi: React.FC = () => {
     if (!dataNascita) return '-';
     const oggi = new Date();
     const nascita = new Date(dataNascita);
-    return oggi.getFullYear() - nascita.getFullYear();
+    let anni = oggi.getFullYear() - nascita.getFullYear();
+    const nonAncoraCompleanno =
+      oggi.getMonth() < nascita.getMonth() ||
+      (oggi.getMonth() === nascita.getMonth() && oggi.getDate() < nascita.getDate());
+    if (nonAncoraCompleanno) anni -= 1;
+    return anni;
   };
 
   const totaleTesserati = gruppi.reduce((acc, g) => acc + (g.num_tesserati || 0), 0);
