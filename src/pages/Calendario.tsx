@@ -119,19 +119,20 @@ const Calendario: React.FC = () => {
     }
   };
 
-  const handleEliminaOccorrenza = async (eventoId: number, forza = false) => {
-    if (!forza && !window.confirm('Eliminare questa singola occorrenza?')) return;
+  const [modalEliminaOccorrenza, setModalEliminaOccorrenza] = useState<{ eventoId: number; nome: string } | null>(null);
+  const [modalConfermaPresenzeOccorrenza, setModalConfermaPresenzeOccorrenza] = useState<{ eventoId: number; nome: string } | null>(null);
+  const [modalEliminaSerie, setModalEliminaSerie] = useState<EventoCalendario | null>(null);
+  const [modalConfermaPresenzeSerie, setModalConfermaPresenzeSerie] = useState<{ evento: EventoCalendario; eliminati: number; saltati: number } | null>(null);
+  const [azioneInCorso, setAzioneInCorso] = useState(false);
+
+  const eseguiEliminaOccorrenza = async (eventoId: number, forza: boolean) => {
+    setAzioneInCorso(true);
     try {
       const res = await eliminaOccorrenza(eventoId, forza);
       if (res.data?.eliminato === false) {
-        if (window.confirm(
-          'Questo evento ha già delle presenze registrate.\n\n' +
-          'Se lo elimini, verranno eliminate anche le presenze collegate e questa azione non è reversibile.\n\n' +
-          'Vuoi eliminarlo comunque?'
-        )) {
-          await handleEliminaOccorrenza(eventoId, true);
-          return;
-        }
+        // ha presenze collegate: chiedi conferma esplicita con un modal dedicato, non un confirm() annidato
+        const nome = eventiTotali.find(e => e.id === eventoId)?.titolo || 'questo evento';
+        setModalConfermaPresenzeOccorrenza({ eventoId, nome });
         return;
       }
       carica();
@@ -139,6 +140,8 @@ const Calendario: React.FC = () => {
       setEventoAzione(null);
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione dell\'evento');
+    } finally {
+      setAzioneInCorso(false);
     }
   };
 
@@ -168,32 +171,26 @@ const Calendario: React.FC = () => {
     }
   };
 
-  const handleEliminaSerieFutura = async (e: EventoCalendario, forza = false) => {
+  const eseguiEliminaSerie = async (e: EventoCalendario, forza: boolean) => {
     if (!e.ricorrente_id) return;
-    if (!forza && !window.confirm(
-      'Stai per eliminare questa e TUTTE le occorrenze future di questo evento ricorrente.\n\n' +
-      'Gli eventi che hanno già presenze registrate NON verranno toccati (te lo chiederò separatamente).\n\n' +
-      'Vuoi continuare?'
-    )) return;
+    setAzioneInCorso(true);
     try {
       const res = await eliminaEventoRicorrente(e.ricorrente_id, true, forza);
-      setGiornoSelezionato(null);
-      setEventoAzione(null);
-      carica();
       const eliminati = res.data?.occorrenze_eliminate ?? 0;
       const saltati = res.data?.saltate_con_presenze ?? 0;
+      carica();
       if (saltati > 0) {
-        if (window.confirm(
-          `Eliminate ${eliminati} occorrenze. ${saltati} eventi NON sono stati eliminati perché hanno già presenze registrate.\n\n` +
-          `Vuoi eliminare anche questi ${saltati} eventi? Le presenze collegate andranno perse e l'azione non è reversibile.`
-        )) {
-          await handleEliminaSerieFutura(e, true);
-        }
+        // mostra un modal esplicito invece di un confirm() annidato, facile da chiudere per sbaglio
+        setModalConfermaPresenzeSerie({ evento: e, eliminati, saltati });
       } else {
+        setGiornoSelezionato(null);
+        setEventoAzione(null);
         alert(`Eliminate ${eliminati} occorrenze future.`);
       }
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione della serie di eventi');
+    } finally {
+      setAzioneInCorso(false);
     }
   };
 
@@ -383,7 +380,7 @@ const Calendario: React.FC = () => {
                     <button onClick={() => apriModificaSingola(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
                       ✏️ Modifica questo evento
                     </button>
-                    <button onClick={() => handleEliminaOccorrenza(eventoAzione.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                    <button onClick={() => setModalEliminaOccorrenza({ eventoId: eventoAzione.id, nome: eventoAzione.titolo })} className="text-red-500 hover:text-red-700 text-xs font-medium">
                       🗑 Elimina solo questo
                     </button>
                     {eventoAzione.ricorrente_id && (
@@ -391,7 +388,7 @@ const Calendario: React.FC = () => {
                         <button onClick={() => apriModificaBlocco(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
                           ✏️ Modifica questa e le successive
                         </button>
-                        <button onClick={() => handleEliminaSerieFutura(eventoAzione)} className="text-red-600 hover:text-red-800 text-xs font-medium">
+                        <button onClick={() => setModalEliminaSerie(eventoAzione)} className="text-red-600 hover:text-red-800 text-xs font-medium">
                           🗑 Elimina questa e le successive
                         </button>
                       </>
@@ -428,7 +425,7 @@ const Calendario: React.FC = () => {
                           <button onClick={() => apriModificaSingola(e)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
                             ✏️ Modifica
                           </button>
-                          <button onClick={() => handleEliminaOccorrenza(e.id)} className="text-red-500 hover:text-red-700 text-xs">
+                          <button onClick={() => setModalEliminaOccorrenza({ eventoId: e.id, nome: e.titolo })} className="text-red-500 hover:text-red-700 text-xs">
                             Elimina solo questa
                           </button>
                           {e.ricorrente_id && (
@@ -437,7 +434,7 @@ const Calendario: React.FC = () => {
                               <button onClick={() => apriModificaBlocco(e)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
                                 ✏️ Modifica questa e le successive
                               </button>
-                              <button onClick={() => handleEliminaSerieFutura(e)} className="text-red-600 hover:text-red-800 text-xs font-medium">
+                              <button onClick={() => setModalEliminaSerie(e)} className="text-red-600 hover:text-red-800 text-xs font-medium">
                                 🗑 Elimina questa e le successive
                               </button>
                             </>
@@ -575,6 +572,109 @@ const Calendario: React.FC = () => {
             </div>
           </div>
         )}
+        {/* CONFERMA: elimina singola occorrenza */}
+        {modalEliminaOccorrenza && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+              <h2 className="text-lg font-bold text-gray-800 mb-2">Eliminare questo evento?</h2>
+              <p className="text-sm text-gray-600 mb-5">"{modalEliminaOccorrenza.nome}" verrà eliminato. Questa azione non è reversibile.</p>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setModalEliminaOccorrenza(null)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button
+                  onClick={() => { const info = modalEliminaOccorrenza; setModalEliminaOccorrenza(null); eseguiEliminaOccorrenza(info.eventoId, false); }}
+                  disabled={azioneInCorso}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                >
+                  {azioneInCorso ? 'Eliminazione...' : 'Elimina'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONFERMA: l'occorrenza singola ha presenze registrate */}
+        {modalConfermaPresenzeOccorrenza && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md border-t-4 border-orange-500">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">⚠️</span>
+                <h2 className="text-lg font-bold text-gray-800">Evento con presenze registrate</h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-5">
+                "{modalConfermaPresenzeOccorrenza.nome}" ha già delle presenze registrate e non è stato eliminato.
+                Se procedi, verranno eliminate anche le presenze collegate e l'azione non sarà reversibile.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setModalConfermaPresenzeOccorrenza(null)} className="px-4 py-2 text-sm text-gray-600">Lascia questo evento</button>
+                <button
+                  onClick={() => { const info = modalConfermaPresenzeOccorrenza; setModalConfermaPresenzeOccorrenza(null); eseguiEliminaOccorrenza(info.eventoId, true); }}
+                  disabled={azioneInCorso}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                >
+                  {azioneInCorso ? 'Eliminazione...' : 'Elimina comunque'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONFERMA: elimina questa e le successive occorrenze */}
+        {modalEliminaSerie && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+              <h2 className="text-lg font-bold text-gray-800 mb-2">Eliminare la serie di eventi?</h2>
+              <p className="text-sm text-gray-600 mb-5">
+                Verranno eliminate questa e <strong>tutte le occorrenze future</strong> di "{modalEliminaSerie.titolo}".
+                Gli eventi con presenze già registrate verranno saltati e te lo segnalerò separatamente.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setModalEliminaSerie(null)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button
+                  onClick={() => { const ev = modalEliminaSerie; setModalEliminaSerie(null); eseguiEliminaSerie(ev, false); }}
+                  disabled={azioneInCorso}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                >
+                  {azioneInCorso ? 'Eliminazione...' : 'Elimina questa e le successive'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONFERMA: alcune occorrenze della serie hanno presenze registrate */}
+        {modalConfermaPresenzeSerie && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md border-t-4 border-orange-500">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">⚠️</span>
+                <h2 className="text-lg font-bold text-gray-800">Alcuni eventi hanno presenze registrate</h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">
+                Eliminate <strong>{modalConfermaPresenzeSerie.eliminati}</strong> occorrenze future.
+              </p>
+              <p className="text-sm text-gray-600 mb-5">
+                <strong>{modalConfermaPresenzeSerie.saltati}</strong> eventi NON sono stati eliminati perché hanno già presenze registrate.
+                Se procedi, verranno eliminate anche le presenze collegate e l'azione non sarà reversibile.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => { setModalConfermaPresenzeSerie(null); setGiornoSelezionato(null); setEventoAzione(null); }}
+                  className="px-4 py-2 text-sm text-gray-600"
+                >
+                  Lascia questi eventi
+                </button>
+                <button
+                  onClick={() => { const info = modalConfermaPresenzeSerie; setModalConfermaPresenzeSerie(null); eseguiEliminaSerie(info.evento, true); }}
+                  disabled={azioneInCorso}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                >
+                  {azioneInCorso ? 'Eliminazione...' : `Elimina anche questi ${modalConfermaPresenzeSerie.saltati}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modifica singola occorrenza (funziona sia per eventi singoli che ricorrenti) */}
         {mostraFormModificaSingola && eventoAzione && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
