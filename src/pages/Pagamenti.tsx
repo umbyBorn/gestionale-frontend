@@ -122,10 +122,14 @@ const Pagamenti: React.FC = () => {
   const filtrati = pagamenti.filter((p) => {
     if (filtro === 'pagati' && !p.pagato) return false;
     if (filtro === 'scaduti' && (p.pagato || p.data_scadenza >= oggi)) return false;
-    if (ricerca && !nomeTesserato(p.tesserato_id).toLowerCase().includes(ricerca.toLowerCase())) return false;
+    if (ricerca) {
+      const q = ricerca.toLowerCase();
+      const testoTesserato = nomeTesserato(p.tesserato_id).toLowerCase();
+      const testoVoce = (p.descrizione || nomeTariffa(p.tariffa_id)).toLowerCase();
+      if (!testoTesserato.includes(q) && !testoVoce.includes(q)) return false;
+    }
     return true;
   });
-
   const totalePagato = pagamenti.filter(p => p.pagato).reduce((a, p) => a + Number(p.importo), 0);
   const totaleDaIncassare = pagamenti.filter(p => !p.pagato).reduce((a, p) => a + Number(p.importo), 0);
   const totaleScaduto = pagamenti.filter(p => !p.pagato && p.data_scadenza < oggi).reduce((a, p) => a + Number(p.importo), 0);
@@ -284,7 +288,7 @@ const Pagamenti: React.FC = () => {
                     ))}
                   </div>
                   <input
-                    type="text" placeholder="Cerca tesserato..." value={ricerca}
+                    type="text" placeholder="Cerca per tesserato o voce (es. Iscrizione, Gita...)" value={ricerca}
                     onChange={e => setRicerca(e.target.value)}
                     className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 max-w-xs"
                   />

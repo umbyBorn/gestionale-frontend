@@ -108,6 +108,8 @@ export const eliminaContratto = (id: number) => api.delete(`/contratti/${id}`);
 // ---- EVENTI E PRESENZE ----
 export const getEventi = () => api.get('/eventi/');
 export const creaEvento = (data: any) => api.post('/eventi/', data);
+export const modificaEvento = (eventoId: number, data: any) => api.put(`/eventi/${eventoId}`, data);
+export const eliminaEvento = (eventoId: number) => api.delete(`/eventi/${eventoId}`);
 export const eliminaOccorrenza = (eventoId: number) => api.delete(`/eventi/${eventoId}/occorrenza`);
 
 // ---- EVENTI RICORRENTI (creazione/modifica/eliminazione in blocco) ----

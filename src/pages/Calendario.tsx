@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
-  getGruppi, creaEventoRicorrente, eliminaOccorrenza,
-  modificaEventoRicorrente, eliminaEventoRicorrente,
+  getGruppi, getEventi, creaEventoRicorrente, eliminaOccorrenza,
+  modificaEvento, modificaEventoRicorrente, eliminaEventoRicorrente,
 } from '../services/api';
+import { formatDate } from '../utils/date';
 import axios from 'axios';
 
 const API_URL = 'https://gestionale-sport-api.onrender.com';
@@ -14,6 +15,19 @@ interface EventoCalendario {
   gruppo_id: number;
   ora_inizio?: string;
   luogo?: string;
+  ricorrente_id?: number;
+}
+
+interface EventoCompleto {
+  id: number;
+  titolo: string;
+  tipo: string;
+  gruppo_id: number;
+  data: string;
+  ora_inizio?: string;
+  ora_fine?: string;
+  luogo?: string;
+  note?: string;
   ricorrente_id?: number;
 }
 
@@ -38,13 +52,22 @@ const Calendario: React.FC = () => {
   const [anno, setAnno] = useState(oggi.getFullYear());
   const [mese, setMese] = useState(oggi.getMonth() + 1);
   const [calendario, setCalendario] = useState<Record<string, EventoCalendario[]>>({});
+  const [eventiTotali, setEventiTotali] = useState<EventoCompleto[]>([]);
   const [gruppi, setGruppi] = useState<Gruppo[]>([]);
   const [loading, setLoading] = useState(true);
   const [giornoSelezionato, setGiornoSelezionato] = useState<string | null>(null);
+  const [ricercaEvento, setRicercaEvento] = useState('');
+  const [eventoAzione, setEventoAzione] = useState<EventoCompleto | null>(null);
   const [mostraFormRicorrente, setMostraFormRicorrente] = useState(false);
   const [form, setForm] = useState({
     gruppo_id: 0, tipo: 'allenamento', titolo: '', ora_inizio: '', ora_fine: '',
     luogo: '', giorni_settimana: [] as number[], data_inizio: '', data_fine: ''
+  });
+
+  // Modifica di una singola occorrenza (indipendentemente dal fatto che sia ricorrente o meno)
+  const [mostraFormModificaSingola, setMostraFormModificaSingola] = useState(false);
+  const [formModificaSingola, setFormModificaSingola] = useState({
+    titolo: '', tipo: 'allenamento', gruppo_id: 0, data: '', ora_inizio: '', ora_fine: '', luogo: '',
   });
 
   // Modifica/eliminazione in blocco di una serie di eventi ricorrenti
@@ -55,12 +78,14 @@ const Calendario: React.FC = () => {
   const carica = async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
-    const [cal, gr] = await Promise.all([
+    const [cal, gr, tutti] = await Promise.all([
       axios.get(`${API_URL}/calendario/?anno=${anno}&mese=${mese}`, { headers: { Authorization: `Bearer ${token}` } }),
-      getGruppi()
+      getGruppi(),
+      getEventi(),
     ]);
     setCalendario(cal.data);
     setGruppi(gr.data);
+    setEventiTotali(tutti.data);
     setLoading(false);
   };
 
@@ -95,6 +120,7 @@ const Calendario: React.FC = () => {
     await eliminaOccorrenza(eventoId);
     carica();
     setGiornoSelezionato(null);
+    setEventoAzione(null);
   };
 
   const apriModificaBlocco = (e: EventoCalendario) => {
@@ -128,6 +154,40 @@ const Calendario: React.FC = () => {
     )) return;
     await eliminaEventoRicorrente(e.ricorrente_id, true);
     setGiornoSelezionato(null);
+    setEventoAzione(null);
+    carica();
+  };
+
+  /** Trova l'oggetto evento completo (con data/ora_fine) a partire dal solo id,
+   * necessario perché la vista mensile del calendario non porta tutti i campi. */
+  const trovaEventoCompleto = (id: number): EventoCompleto | undefined =>
+    eventiTotali.find(ev => ev.id === id);
+
+  const apriModificaSingola = (eventoParziale: { id: number }) => {
+    const e = trovaEventoCompleto(eventoParziale.id);
+    if (!e) { alert('Evento non trovato, ricarico i dati...'); carica(); return; }
+    setEventoAzione(e);
+    setFormModificaSingola({
+      titolo: e.titolo, tipo: e.tipo, gruppo_id: e.gruppo_id, data: e.data,
+      ora_inizio: e.ora_inizio || '', ora_fine: e.ora_fine || '', luogo: e.luogo || '',
+    });
+    setMostraFormModificaSingola(true);
+  };
+
+  const handleSalvaModificaSingola = async () => {
+    if (!eventoAzione) return;
+    await modificaEvento(eventoAzione.id, {
+      titolo: formModificaSingola.titolo,
+      tipo: formModificaSingola.tipo,
+      gruppo_id: formModificaSingola.gruppo_id,
+      data: formModificaSingola.data,
+      ora_inizio: formModificaSingola.ora_inizio || null,
+      ora_fine: formModificaSingola.ora_fine || null,
+      luogo: formModificaSingola.luogo,
+    });
+    setMostraFormModificaSingola(false);
+    setEventoAzione(null);
+    setGiornoSelezionato(null);
     carica();
   };
 
@@ -141,6 +201,16 @@ const Calendario: React.FC = () => {
   };
 
   const nomeGruppo = (id: number) => gruppi.find(g => g.id === id)?.nome || `Gruppo ${id}`;
+
+  const oggiStr = `${oggi.getFullYear()}-${String(oggi.getMonth() + 1).padStart(2, '0')}-${String(oggi.getDate()).padStart(2, '0')}`;
+  const eventiFiltrati = eventiTotali
+    .filter(e => {
+      if (!ricercaEvento.trim()) return e.data >= oggiStr; // di default mostra solo i prossimi eventi
+      const q = ricercaEvento.toLowerCase();
+      return e.titolo.toLowerCase().includes(q) || nomeGruppo(e.gruppo_id).toLowerCase().includes(q);
+    })
+    .sort((a, b) => a.data.localeCompare(b.data))
+    .slice(0, 30);
 
   const offset = primoGiornoMese();
   const totGiorni = giorniNelMese();
@@ -162,6 +232,66 @@ const Calendario: React.FC = () => {
           <button onClick={() => setMostraFormRicorrente(true)} className="bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition w-fit">
             + Nuovo evento ricorrente
           </button>
+        </div>
+
+        {/* COMBO: cerca un evento esistente e agisci direttamente, senza dover cliccare sul giorno */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">🔍 Trova un evento e modificalo o eliminalo</h3>
+          <input
+            type="text"
+            value={ricercaEvento}
+            onChange={(e) => setRicercaEvento(e.target.value)}
+            placeholder="Cerca per titolo o gruppo... (di default mostra i prossimi eventi)"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="max-h-56 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-lg">
+            {eventiFiltrati.length === 0 ? (
+              <p className="text-gray-400 text-sm p-3">Nessun evento trovato</p>
+            ) : eventiFiltrati.map(e => (
+              <button
+                key={e.id}
+                onClick={() => setEventoAzione(eventoAzione?.id === e.id ? null : e)}
+                className={`w-full text-left px-3 py-2 flex items-center justify-between gap-3 hover:bg-blue-50 transition ${eventoAzione?.id === e.id ? 'bg-blue-50' : ''}`}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">
+                    {e.titolo} {e.ricorrente_id && <span className="text-gray-400" title="Serie ricorrente">🔁</span>}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {formatDate(e.data)} {e.ora_inizio ? `· ${e.ora_inizio.slice(0, 5)}` : ''} · {nomeGruppo(e.gruppo_id)}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${tipoColore[e.tipo]}`}>{e.tipo}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Pannello azioni per l'evento selezionato dalla combo */}
+          {eventoAzione && (
+            <div className="mt-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
+              <p className="text-sm font-medium text-gray-800 mb-2">
+                Azioni per "{eventoAzione.titolo}" — {formatDate(eventoAzione.data)}
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                <button onClick={() => apriModificaSingola(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                  ✏️ Modifica questo evento
+                </button>
+                <button onClick={() => handleEliminaOccorrenza(eventoAzione.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                  🗑 Elimina solo questo
+                </button>
+                {eventoAzione.ricorrente_id && (
+                  <>
+                    <button onClick={() => apriModificaBlocco(eventoAzione)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                      ✏️ Modifica questa e le successive
+                    </button>
+                    <button onClick={() => handleEliminaSerieFutura(eventoAzione)} className="text-red-600 hover:text-red-800 text-xs font-medium">
+                      🗑 Elimina questa e le successive
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -252,6 +382,9 @@ const Calendario: React.FC = () => {
                           <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${tipoColore[e.tipo]}`}>{e.tipo}</span>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                          <button onClick={() => apriModificaSingola(e)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                            ✏️ Modifica
+                          </button>
                           <button onClick={() => handleEliminaOccorrenza(e.id)} className="text-red-500 hover:text-red-700 text-xs">
                             Elimina solo questa
                           </button>
@@ -395,6 +528,78 @@ const Calendario: React.FC = () => {
                 <button onClick={handleSalvaModificaBlocco} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">
                   Applica a questa e alle successive
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Modifica singola occorrenza (funziona sia per eventi singoli che ricorrenti) */}
+        {mostraFormModificaSingola && eventoAzione && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-screen overflow-y-auto">
+              <h2 className="text-lg font-bold text-gray-800 mb-1">Modifica evento</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                {eventoAzione.ricorrente_id
+                  ? 'Modifica solo questa occorrenza; le altre date della serie ricorrente non vengono toccate.'
+                  : 'Modifica i dettagli di questo evento.'}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Titolo</label>
+                  <input type="text" value={formModificaSingola.titolo}
+                    onChange={(e) => setFormModificaSingola({ ...formModificaSingola, titolo: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Gruppo</label>
+                    <select value={formModificaSingola.gruppo_id}
+                      onChange={(e) => setFormModificaSingola({ ...formModificaSingola, gruppo_id: parseInt(e.target.value) })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      {gruppi.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                    <select value={formModificaSingola.tipo}
+                      onChange={(e) => setFormModificaSingola({ ...formModificaSingola, tipo: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="allenamento">Allenamento</option>
+                      <option value="partita">Partita</option>
+                      <option value="raduno">Raduno</option>
+                      <option value="altro">Altro</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" value={formModificaSingola.data}
+                      onChange={(e) => setFormModificaSingola({ ...formModificaSingola, data: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora inizio</label>
+                    <input type="time" value={formModificaSingola.ora_inizio}
+                      onChange={(e) => setFormModificaSingola({ ...formModificaSingola, ora_inizio: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora fine</label>
+                    <input type="time" value={formModificaSingola.ora_fine}
+                      onChange={(e) => setFormModificaSingola({ ...formModificaSingola, ora_fine: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Luogo</label>
+                  <input type="text" value={formModificaSingola.luogo}
+                    onChange={(e) => setFormModificaSingola({ ...formModificaSingola, luogo: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6 justify-end">
+                <button onClick={() => { setMostraFormModificaSingola(false); setEventoAzione(null); }} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button onClick={handleSalvaModificaSingola} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Salva modifiche</button>
               </div>
             </div>
           </div>
