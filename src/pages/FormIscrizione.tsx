@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { formatDate } from '../utils/date';
 
 const API = 'https://gestionale-sport-api.onrender.com';
 
@@ -234,7 +235,7 @@ const FormIscrizione: React.FC = () => {
                 <p className="text-sm font-semibold text-blue-800 mb-2">📋 Riepilogo iscrizione</p>
                 <div className="text-sm text-blue-700 space-y-1">
                   <p><strong>Tesserato:</strong> {form.nome} {form.cognome}</p>
-                  <p><strong>Data di nascita:</strong> {form.data_nascita}</p>
+                  <p><strong>Data di nascita:</strong> {formatDate(form.data_nascita)}</p>
                   {form.email && <p><strong>Email:</strong> {form.email}</p>}
                   {form.sport && <p><strong>Sport:</strong> {form.sport}</p>}
                   {isMinorenne() && form.genitore_nome && (

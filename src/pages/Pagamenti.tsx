@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { formatDate } from '../utils/date';
 import {
   getPagamenti, creaPagamento, aggiornaPagamento, eliminaPagamento,
   getTariffe, creaTariffa, getTesserati, registraIncasso,
   generaPianoScadenze, creaPagamentoGruppo, getGruppi,
+  modificaBatch, eliminaBatch,
 } from '../services/api';
 
 interface Pagamento {
@@ -43,6 +45,8 @@ const Pagamenti: React.FC = () => {
   const [mostraFormTariffa, setMostraFormTariffa] = useState(false);
   const [pagamentoInModifica, setPagamentoInModifica] = useState<Pagamento | null>(null);
   const [messaggio, setMessaggio] = useState('');
+  const [batchInModifica, setBatchInModifica] = useState<{ id: string; nome: string; count: number } | null>(null);
+  const [formBatch, setFormBatch] = useState({ importo: '', data_scadenza: '' });
 
   const [formPagamento, setFormPagamento] = useState({
     tesserato_id: 0, tariffa_id: 0, importo: 0, data_scadenza: '', pagato: false, descrizione: '',
@@ -126,6 +130,63 @@ const Pagamenti: React.FC = () => {
   const totaleDaIncassare = pagamenti.filter(p => !p.pagato).reduce((a, p) => a + Number(p.importo), 0);
   const totaleScaduto = pagamenti.filter(p => !p.pagato && p.data_scadenza < oggi).reduce((a, p) => a + Number(p.importo), 0);
 
+  // Raggruppa i pagamenti generati in blocco (piano scadenze / pagamento di gruppo) per gestione massiva
+  const batches = React.useMemo(() => {
+    const mappa = new Map<string, { id: string; nome: string; count: number; countNonPagati: number; totale: number }>();
+    pagamenti.forEach(p => {
+      if (!p.gruppo_generazione_id) return;
+      const esistente = mappa.get(p.gruppo_generazione_id);
+      if (esistente) {
+        esistente.count += 1;
+        if (!p.pagato) esistente.countNonPagati += 1;
+        esistente.totale += Number(p.importo);
+      } else {
+        mappa.set(p.gruppo_generazione_id, {
+          id: p.gruppo_generazione_id,
+          nome: p.descrizione || nomeTariffa(p.tariffa_id),
+          count: 1,
+          countNonPagati: p.pagato ? 0 : 1,
+          totale: Number(p.importo),
+        });
+      }
+    });
+    return Array.from(mappa.values());
+  }, [pagamenti]);
+
+  const apriModificaBatch = (b: { id: string; nome: string; count: number }) => {
+    setBatchInModifica(b);
+    setFormBatch({ importo: '', data_scadenza: '' });
+  };
+
+  const handleSalvaModificaBatch = async () => {
+    if (!batchInModifica) return;
+    const payload: any = { solo_non_pagati: true };
+    if (formBatch.importo) payload.importo = parseFloat(formBatch.importo);
+    if (formBatch.data_scadenza) payload.data_scadenza = formBatch.data_scadenza;
+    if (!payload.importo && !payload.data_scadenza) {
+      alert('Inserisci almeno un campo da modificare (importo o data)');
+      return;
+    }
+    const res = await modificaBatch(batchInModifica.id, payload);
+    setBatchInModifica(null);
+    flash(`Modificati ${res.data.modificati} pagamenti non ancora pagati del gruppo "${batchInModifica.nome}".`);
+    carica();
+  };
+
+  const handleEliminaBatch = async (b: { id: string; nome: string; countNonPagati: number }) => {
+    if (b.countNonPagati === 0) {
+      alert('Tutti i pagamenti di questo gruppo sono già stati incassati: non c\'è nulla da eliminare.');
+      return;
+    }
+    if (!window.confirm(
+      `Stai per eliminare i ${b.countNonPagati} pagamenti NON ANCORA PAGATI del gruppo "${b.nome}".\n\n` +
+      `I pagamenti già incassati non verranno toccati. Questa operazione è irreversibile.\n\nContinuare?`
+    )) return;
+    const res = await eliminaBatch(b.id, true);
+    flash(`Eliminati ${res.data.eliminati} pagamenti non pagati del gruppo "${b.nome}".`);
+    carica();
+  };
+
   return (
     <div className="bg-gray-50 min-h-full">
       <main className="p-6 max-w-6xl mx-auto">
@@ -179,6 +240,35 @@ const Pagamenti: React.FC = () => {
             {/* ============ SCADENZARIO ============ */}
             {tab === 'scadenzario' && (
               <div>
+                {batches.length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Gruppi generati in blocco</h3>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Pagamenti creati insieme (piano scadenze o pagamento di gruppo). Puoi modificarli o eliminarli tutti insieme se creati per errore.
+                    </p>
+                    <div className="space-y-2">
+                      {batches.map(b => (
+                        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                          <div className="text-sm">
+                            <span className="font-medium text-gray-800">{b.nome}</span>
+                            <span className="text-gray-500 ml-2 text-xs">
+                              {b.count} pagamenti · {b.countNonPagati} da incassare · totale € {b.totale.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex gap-3">
+                            <button onClick={() => apriModificaBatch(b)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                              ✏️ Modifica non pagati
+                            </button>
+                            <button onClick={() => handleEliminaBatch(b)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                              🗑 Elimina non pagati
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
                   <div className="flex gap-2">
                     {(['tutti', 'scaduti', 'pagati'] as const).map((f) => (
@@ -224,7 +314,7 @@ const Pagamenti: React.FC = () => {
                           <td className="px-4 py-3 font-medium text-gray-700">{nomeTesserato(p.tesserato_id)}</td>
                           <td className="px-4 py-3 text-gray-500">{p.descrizione || nomeTariffa(p.tariffa_id)}</td>
                           <td className="px-4 py-3 font-medium">€ {Number(p.importo).toFixed(2)}</td>
-                          <td className="px-4 py-3">{p.data_scadenza}</td>
+                          <td className="px-4 py-3">{formatDate(p.data_scadenza)}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               p.pagato ? 'bg-green-100 text-green-700' :
@@ -392,6 +482,36 @@ const Pagamenti: React.FC = () => {
               <div className="flex gap-3 justify-end">
                 <button onClick={() => setPagamentoInModifica(null)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
                 <button onClick={handleSalvaModifica} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-800">Salva</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODIFICA IN BLOCCO BATCH */}
+        {batchInModifica && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+              <h2 className="text-lg font-bold text-gray-800 mb-1">Modifica in blocco</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                "{batchInModifica.nome}" · {batchInModifica.count} pagamenti nel gruppo. Le modifiche si applicano solo a quelli <strong>non ancora pagati</strong>. Lascia vuoto un campo per non modificarlo.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nuovo importo (€) — opzionale</label>
+                <input type="number" value={formBatch.importo} placeholder="Lascia vuoto per non modificare"
+                  onChange={(e) => setFormBatch({ ...formBatch, importo: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nuova data scadenza — opzionale</label>
+                <input type="date" value={formBatch.data_scadenza}
+                  onChange={(e) => setFormBatch({ ...formBatch, data_scadenza: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setBatchInModifica(null)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button onClick={handleSalvaModificaBatch} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-800">
+                  Applica al gruppo
+                </button>
               </div>
             </div>
           </div>

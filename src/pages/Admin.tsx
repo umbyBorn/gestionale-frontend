@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getUtenti, creaUtente, aggiornaPermesso, toggleUtente, cambiaPassword, getTesserati } from '../services/api';
+import { getUtenti, creaUtente, modificaUtente, eliminaUtente, aggiornaPermesso, toggleUtente, cambiaPassword, getTesserati } from '../services/api';
 
 interface Utente {
   id: number;
@@ -36,6 +36,11 @@ const Admin: React.FC = () => {
   const [nuovaPassword, setNuovaPassword] = useState('');
   const [mostraPassword, setMostraPassword] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', ruolo: 'operatore', tesserato_id: '' });
+  const [mostraFormModifica, setMostraFormModifica] = useState(false);
+  const [formModifica, setFormModifica] = useState({ email: '', ruolo: 'operatore', tesserato_id: '' });
+  const [mostraConfermaElimina, setMostraConfermaElimina] = useState(false);
+  const [confermaTesto, setConfermaTesto] = useState('');
+  const [erroreEliminazione, setErroreEliminazione] = useState('');
 
   const carica = () => {
     Promise.all([getUtenti(), getTesserati()]).then(([u, t]) => {
@@ -78,6 +83,49 @@ const Admin: React.FC = () => {
   const handleToggleAttivo = async (utente: Utente) => {
     await toggleUtente(utente.id, !utente.attivo);
     carica();
+  };
+
+  const apriModifica = (u: Utente) => {
+    setFormModifica({ email: u.email, ruolo: u.ruolo, tesserato_id: u.tesserato_id ? String(u.tesserato_id) : '' });
+    setMostraFormModifica(true);
+  };
+
+  const handleSalvaModifica = async () => {
+    if (!utenteSelezionato) return;
+    try {
+      await modificaUtente(utenteSelezionato.id, {
+        email: formModifica.email,
+        ruolo: formModifica.ruolo,
+        tesserato_id: formModifica.tesserato_id ? parseInt(formModifica.tesserato_id) : null,
+      });
+      setMostraFormModifica(false);
+      carica();
+      setUtenteSelezionato(prev => prev ? { ...prev, email: formModifica.email, ruolo: formModifica.ruolo } : prev);
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || 'Errore durante la modifica');
+    }
+  };
+
+  const apriConfermaElimina = () => {
+    setConfermaTesto('');
+    setErroreEliminazione('');
+    setMostraConfermaElimina(true);
+  };
+
+  const handleEliminaDefinitivo = async () => {
+    if (!utenteSelezionato) return;
+    if (confermaTesto.trim().toLowerCase() !== utenteSelezionato.email.trim().toLowerCase()) {
+      setErroreEliminazione('L\'email digitata non corrisponde. Controlla e riprova.');
+      return;
+    }
+    try {
+      await eliminaUtente(utenteSelezionato.id);
+      setMostraConfermaElimina(false);
+      setUtenteSelezionato(null);
+      carica();
+    } catch (e: any) {
+      setErroreEliminazione(e?.response?.data?.detail || 'Errore durante l\'eliminazione');
+    }
   };
 
   const handleCambiaPassword = async () => {
@@ -144,7 +192,12 @@ const Admin: React.FC = () => {
                         {utenteSelezionato.tesserato_nome && ` · ${utenteSelezionato.tesserato_nome}`}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => apriModifica(utenteSelezionato)}
+                        className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200">
+                        Modifica
+                      </button>
                       <button
                         onClick={() => handleToggleAttivo(utenteSelezionato)}
                         className={`px-3 py-1.5 rounded text-xs font-medium ${
@@ -158,6 +211,11 @@ const Admin: React.FC = () => {
                         onClick={() => setMostraPassword(!mostraPassword)}
                         className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200">
                         Cambia password
+                      </button>
+                      <button
+                        onClick={apriConfermaElimina}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700">
+                        🗑 Elimina definitivamente
                       </button>
                     </div>
                   </div>
@@ -269,6 +327,84 @@ const Admin: React.FC = () => {
             <div className="flex gap-3 justify-end mt-4">
               <button onClick={() => setMostraForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annulla</button>
               <button onClick={handleCreaUtente} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Crea utente</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* FORM MODIFICA UTENTE */}
+      {mostraFormModifica && utenteSelezionato && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Modifica Utente</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                <input type="email" value={formModifica.email} onChange={e => setFormModifica(f => ({ ...f, email: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Ruolo</label>
+                <select value={formModifica.ruolo} onChange={e => setFormModifica(f => ({ ...f, ruolo: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                  {RUOLI.map(r => <option key={r} value={r} className="capitalize">{r}</option>)}
+                </select>
+              </div>
+              {formModifica.ruolo === 'tesserato' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Collega a tesserato</label>
+                  <select value={formModifica.tesserato_id} onChange={e => setFormModifica(f => ({ ...f, tesserato_id: e.target.value }))}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                    <option value="">-- Nessuno --</option>
+                    {[...tesserati].sort((a, b) => a.cognome.localeCompare(b.cognome)).map(t => (
+                      <option key={t.id} value={t.id}>{t.cognome} {t.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 justify-end mt-4">
+              <button onClick={() => setMostraFormModifica(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annulla</button>
+              <button onClick={handleSalvaModifica} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Salva modifiche</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFERMA ELIMINAZIONE DEFINITIVA */}
+      {mostraConfermaElimina && utenteSelezionato && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md border-t-4 border-red-600">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl">⚠️</span>
+              <h2 className="text-lg font-bold text-red-700">Eliminazione definitiva</h2>
+            </div>
+            <p className="text-sm text-gray-700 mb-2">
+              Stai per eliminare <strong>permanentemente</strong> l'utente <strong>{utenteSelezionato.email}</strong>.
+            </p>
+            <p className="text-sm text-gray-600 mb-4">
+              Questa azione <strong>non può essere annullata</strong>. L'utente perderà l'accesso immediatamente
+              {utenteSelezionato.tesserato_nome && <> e il collegamento con il tesserato <strong>{utenteSelezionato.tesserato_nome}</strong> verrà rimosso (il tesserato non verrà eliminato)</>}.
+            </p>
+            <p className="text-sm text-gray-700 mb-2">
+              Per confermare, digita l'indirizzo email dell'utente: <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{utenteSelezionato.email}</span>
+            </p>
+            <input
+              type="text"
+              value={confermaTesto}
+              onChange={e => setConfermaTesto(e.target.value)}
+              placeholder="Digita l'email per confermare"
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-2"
+              autoFocus
+            />
+            {erroreEliminazione && <p className="text-xs text-red-600 mb-2">{erroreEliminazione}</p>}
+            <div className="flex gap-3 justify-end mt-4">
+              <button onClick={() => setMostraConfermaElimina(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annulla</button>
+              <button
+                onClick={handleEliminaDefinitivo}
+                disabled={confermaTesto.trim().toLowerCase() !== utenteSelezionato.email.trim().toLowerCase()}
+                className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                Elimina definitivamente
+              </button>
             </div>
           </div>
         </div>

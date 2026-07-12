@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatDate } from '../utils/date';
 
 const API = 'https://gestionale-sport-api.onrender.com';
 
@@ -169,7 +170,7 @@ const Iscrizioni: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-gray-800">{r.nome} {r.cognome}</p>
-                  <p className="text-xs text-gray-500">{r.data_nascita} · {r.email || r.telefono || '-'} · {r.data_invio}</p>
+                  <p className="text-xs text-gray-500">{formatDate(r.data_nascita)} · {r.email || r.telefono || '-'} · {formatDate(r.data_invio)}</p>
                 </div>
                 {badgeStato(r.stato)}
                 <span className="text-gray-300">›</span>

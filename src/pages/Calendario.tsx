@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import {
+  getGruppi, creaEventoRicorrente, eliminaOccorrenza,
+  modificaEventoRicorrente, eliminaEventoRicorrente,
+} from '../services/api';
 import axios from 'axios';
-import { getGruppi } from '../services/api';
 
 const API_URL = 'https://gestionale-sport-api.onrender.com';
 
@@ -44,6 +47,11 @@ const Calendario: React.FC = () => {
     luogo: '', giorni_settimana: [] as number[], data_inizio: '', data_fine: ''
   });
 
+  // Modifica/eliminazione in blocco di una serie di eventi ricorrenti
+  const [eventoRicorrenteAzione, setEventoRicorrenteAzione] = useState<EventoCalendario | null>(null);
+  const [mostraFormModificaBlocco, setMostraFormModificaBlocco] = useState(false);
+  const [formModificaBlocco, setFormModificaBlocco] = useState({ titolo: '', ora_inizio: '', ora_fine: '', luogo: '' });
+
   const carica = async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
@@ -76,11 +84,7 @@ const Calendario: React.FC = () => {
   const giorniNelMese = () => new Date(anno, mese, 0).getDate();
 
   const handleCreaRicorrente = async () => {
-    const token = localStorage.getItem('token');
-    await axios.post(`${API_URL}/eventi-ricorrenti/`, {
-      ...form,
-      giorni_settimana: form.giorni_settimana
-    }, { headers: { Authorization: `Bearer ${token}` } });
+    await creaEventoRicorrente({ ...form, giorni_settimana: form.giorni_settimana });
     setMostraFormRicorrente(false);
     setForm({ gruppo_id: 0, tipo: 'allenamento', titolo: '', ora_inizio: '', ora_fine: '', luogo: '', giorni_settimana: [], data_inizio: '', data_fine: '' });
     carica();
@@ -88,10 +92,43 @@ const Calendario: React.FC = () => {
 
   const handleEliminaOccorrenza = async (eventoId: number) => {
     if (!window.confirm('Eliminare questa singola occorrenza?')) return;
-    const token = localStorage.getItem('token');
-    await axios.delete(`${API_URL}/eventi/${eventoId}/occorrenza`, { headers: { Authorization: `Bearer ${token}` } });
+    await eliminaOccorrenza(eventoId);
     carica();
     setGiornoSelezionato(null);
+  };
+
+  const apriModificaBlocco = (e: EventoCalendario) => {
+    setEventoRicorrenteAzione(e);
+    setFormModificaBlocco({ titolo: e.titolo, ora_inizio: e.ora_inizio || '', ora_fine: '', luogo: e.luogo || '' });
+    setMostraFormModificaBlocco(true);
+  };
+
+  const handleSalvaModificaBlocco = async () => {
+    if (!eventoRicorrenteAzione?.ricorrente_id) return;
+    const res = await modificaEventoRicorrente(eventoRicorrenteAzione.ricorrente_id, {
+      titolo: formModificaBlocco.titolo,
+      ora_inizio: formModificaBlocco.ora_inizio || null,
+      ora_fine: formModificaBlocco.ora_fine || null,
+      luogo: formModificaBlocco.luogo,
+      solo_futuri: true,
+    });
+    setMostraFormModificaBlocco(false);
+    setEventoRicorrenteAzione(null);
+    setGiornoSelezionato(null);
+    carica();
+    alert(res.data?.messaggio || 'Occorrenze future aggiornate');
+  };
+
+  const handleEliminaSerieFutura = async (e: EventoCalendario) => {
+    if (!e.ricorrente_id) return;
+    if (!window.confirm(
+      'Stai per eliminare questa e TUTTE le occorrenze future di questo evento ricorrente.\n\n' +
+      'Le occorrenze passate (già svolte, con eventuali presenze registrate) NON verranno toccate.\n\n' +
+      'Vuoi continuare?'
+    )) return;
+    await eliminaEventoRicorrente(e.ricorrente_id, true);
+    setGiornoSelezionato(null);
+    carica();
   };
 
   const toggleGiorno = (g: number) => {
@@ -204,7 +241,9 @@ const Calendario: React.FC = () => {
                       <div key={e.id} className="p-3 rounded-lg border-l-4 border-blue-300 bg-gray-50">
                         <div className="flex justify-between items-start gap-2">
                           <div>
-                            <p className="font-medium text-sm text-gray-800">{e.titolo}</p>
+                            <p className="font-medium text-sm text-gray-800">
+                              {e.titolo} {e.ricorrente_id && <span className="text-gray-400" title="Fa parte di una serie ricorrente">🔁</span>}
+                            </p>
                             <p className="text-xs text-gray-500 mt-0.5">
                               {e.ora_inizio ? e.ora_inizio.slice(0, 5) : ''} {e.luogo ? `· ${e.luogo}` : ''}
                             </p>
@@ -212,9 +251,22 @@ const Calendario: React.FC = () => {
                           </div>
                           <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${tipoColore[e.tipo]}`}>{e.tipo}</span>
                         </div>
-                        <button onClick={() => handleEliminaOccorrenza(e.id)} className="text-red-500 hover:text-red-700 text-xs mt-2">
-                          Elimina occorrenza
-                        </button>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                          <button onClick={() => handleEliminaOccorrenza(e.id)} className="text-red-500 hover:text-red-700 text-xs">
+                            Elimina solo questa
+                          </button>
+                          {e.ricorrente_id && (
+                            <>
+                              <span className="text-gray-300 text-xs">·</span>
+                              <button onClick={() => apriModificaBlocco(e)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                                ✏️ Modifica questa e le successive
+                              </button>
+                              <button onClick={() => handleEliminaSerieFutura(e)} className="text-red-600 hover:text-red-800 text-xs font-medium">
+                                🗑 Elimina questa e le successive
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -302,6 +354,47 @@ const Calendario: React.FC = () => {
               <div className="flex gap-3 mt-6 justify-end">
                 <button onClick={() => setMostraFormRicorrente(false)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
                 <button onClick={handleCreaRicorrente} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Genera eventi</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Modifica in blocco (questa e le successive occorrenze) */}
+        {mostraFormModificaBlocco && eventoRicorrenteAzione && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+              <h2 className="text-lg font-bold text-gray-800 mb-1">Modifica in blocco</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Le modifiche verranno applicate a <strong>questa occorrenza e a tutte quelle future</strong> della stessa serie ricorrente. Gli eventi già passati non vengono toccati.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Titolo</label>
+                  <input type="text" value={formModificaBlocco.titolo} onChange={(e) => setFormModificaBlocco({ ...formModificaBlocco, titolo: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora inizio</label>
+                    <input type="time" value={formModificaBlocco.ora_inizio} onChange={(e) => setFormModificaBlocco({ ...formModificaBlocco, ora_inizio: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora fine</label>
+                    <input type="time" value={formModificaBlocco.ora_fine} onChange={(e) => setFormModificaBlocco({ ...formModificaBlocco, ora_fine: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Luogo</label>
+                  <input type="text" value={formModificaBlocco.luogo} onChange={(e) => setFormModificaBlocco({ ...formModificaBlocco, luogo: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6 justify-end">
+                <button onClick={() => setMostraFormModificaBlocco(false)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button onClick={handleSalvaModificaBlocco} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">
+                  Applica a questa e alle successive
+                </button>
               </div>
             </div>
           </div>

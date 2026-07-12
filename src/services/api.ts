@@ -56,6 +56,8 @@ export const getPagamentiScaduti = () => api.get('/pagamenti/scaduti/');
 export const creaPagamento = (data: any) => api.post('/pagamenti/', data);
 export const aggiornaPagamento = (id: number, data: any) => api.put(`/pagamenti/${id}`, data);
 export const eliminaPagamento = (id: number) => api.delete(`/pagamenti/${id}`);
+export const eliminaPagamentiNonPagatiTesserato = (tesseratoId: number) =>
+  api.delete(`/pagamenti/tesserato/${tesseratoId}/non-pagati`);
 export const registraIncasso = (id: number, metodo: string) =>
   api.put(`/pagamenti/${id}/registra-incasso?metodo=${metodo}`);
 
@@ -64,6 +66,7 @@ export const generaPianoScadenze = (data: any) => api.post('/pagamenti/piano-sca
 // Pagamenti ad hoc di gruppo (completino, gita, torneo...)
 export const creaPagamentoGruppo = (data: any) => api.post('/pagamenti/gruppo', data);
 export const getPagamentiBatch = (batchId: string) => api.get(`/pagamenti/batch/${batchId}`);
+export const modificaBatch = (batchId: string, data: any) => api.put(`/pagamenti/batch/${batchId}`, data);
 export const eliminaBatch = (batchId: string, soloNonPagati = true) =>
   api.delete(`/pagamenti/batch/${batchId}?solo_non_pagati=${soloNonPagati}`);
 
@@ -105,6 +108,14 @@ export const eliminaContratto = (id: number) => api.delete(`/contratti/${id}`);
 // ---- EVENTI E PRESENZE ----
 export const getEventi = () => api.get('/eventi/');
 export const creaEvento = (data: any) => api.post('/eventi/', data);
+export const eliminaOccorrenza = (eventoId: number) => api.delete(`/eventi/${eventoId}/occorrenza`);
+
+// ---- EVENTI RICORRENTI (creazione/modifica/eliminazione in blocco) ----
+export const getEventiRicorrenti = () => api.get('/eventi-ricorrenti/');
+export const creaEventoRicorrente = (data: any) => api.post('/eventi-ricorrenti/', data);
+export const modificaEventoRicorrente = (id: number, data: any) => api.put(`/eventi-ricorrenti/${id}`, data);
+export const eliminaEventoRicorrente = (id: number, eliminaFuturi = true) =>
+  api.delete(`/eventi-ricorrenti/${id}?elimina_futuri=${eliminaFuturi}`);
 export const getPresenzeEvento = (eventoId: number) => api.get(`/eventi/${eventoId}/presenze`);
 export const registraPresenza = (data: any) => api.post('/presenze/', data);
 
@@ -178,6 +189,8 @@ export const importaStaff = (file: File) => {
 // ---- ADMIN ----
 export const getUtenti = () => api.get('/admin/utenti');
 export const creaUtente = (data: any) => api.post('/admin/utenti', data);
+export const modificaUtente = (utenteId: number, data: any) => api.put(`/admin/utenti/${utenteId}`, data);
+export const eliminaUtente = (utenteId: number) => api.delete(`/admin/utenti/${utenteId}`);
 export const aggiornaPermesso = (utenteId: number, sezione: string, abilitato: boolean) =>
   api.put(`/admin/utenti/${utenteId}/permesso`, { sezione, abilitato });
 export const toggleUtente = (utenteId: number, attivo: boolean) =>

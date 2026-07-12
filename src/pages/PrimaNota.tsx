@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getMovimenti, creaMovimento, aggiornaMovimento, eliminaMovimento } from '../services/api';
+import { formatDate } from '../utils/date';
 
 interface Movimento {
   id: number;
@@ -168,7 +169,7 @@ const PrimaNota: React.FC = () => {
               <tbody>
                 {filtrati.map((m, i) => (
                   <tr key={m.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
-                    <td className="px-4 py-3">{m.data}</td>
+                    <td className="px-4 py-3">{formatDate(m.data)}</td>
                     <td className="px-4 py-3 font-medium text-gray-700">
                       {m.descrizione}
                       {m.pagamento_id && <span className="ml-2 text-xs text-gray-400">(da incasso)</span>}

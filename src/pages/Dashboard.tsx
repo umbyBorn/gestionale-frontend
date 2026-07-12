@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getTesserati, getGruppi, getPagamentiScaduti, getStaff, getEventi, getMessaggiInviati } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { formatDate } from '../utils/date';
 
 interface Stat {
   label: string;
@@ -233,7 +234,7 @@ const Dashboard: React.FC = () => {
               {pagamentiScaduti.map(p => (
                 <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-100">
                   <div>
-                    <p className="text-xs text-gray-500">Scad. {p.data_scadenza}</p>
+                    <p className="text-xs text-gray-500">Scad. {formatDate(p.data_scadenza)}</p>
                   </div>
                   <span className="text-sm font-bold text-red-600">€ {p.importo.toFixed(2)}</span>
                 </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatDate } from '../utils/date';
 import {
   getStaff, creaStaff, aggiornaStaff, eliminaStaff,
   getGruppiStaff, aggiornaGruppiStaff, getGruppi,
@@ -248,7 +249,7 @@ const Staff: React.FC = () => {
                           <div key={c.id} className={`flex justify-between items-center rounded-lg px-3 py-2 text-sm ${c.soglia_superata ? 'bg-red-50' : 'bg-gray-50'}`}>
                             <div>
                               <p className="font-medium">{c.descrizione || 'Compenso'}</p>
-                              <p className="text-xs text-gray-500">{c.data_erogazione} · progressivo € {Number(c.totale_progressivo).toFixed(2)}</p>
+                              <p className="text-xs text-gray-500">{formatDate(c.data_erogazione)} · progressivo € {Number(c.totale_progressivo).toFixed(2)}</p>
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="font-bold">€ {Number(c.importo).toFixed(2)}</span>
@@ -272,7 +273,7 @@ const Staff: React.FC = () => {
                           <div key={c.id} className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2 text-sm">
                             <div>
                               <p className="font-medium capitalize">{c.tipo}</p>
-                              <p className="text-xs text-gray-500">{c.data_inizio} {c.data_fine ? `→ ${c.data_fine}` : '(a tempo indeterminato)'}</p>
+                              <p className="text-xs text-gray-500">{formatDate(c.data_inizio)} {c.data_fine ? `→ ${formatDate(c.data_fine)}` : '(a tempo indeterminato)'}</p>
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="font-bold">€ {Number(c.importo).toFixed(2)}</span>

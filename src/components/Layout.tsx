@@ -213,8 +213,8 @@ const Layout: React.FC<LayoutProps> = ({ children, titolo }) => {
           })}
         </nav>
 
-        {/* PUSH NOTIFICATIONS */}
-        {sidebarAperta && (
+        {/* PUSH NOTIFICATIONS — temporaneamente nascosta (logica mantenuta) */}
+        {false && sidebarAperta && (
           <div className="px-4 py-2 border-t border-white/10">
             {!iscritto ? (
               <button

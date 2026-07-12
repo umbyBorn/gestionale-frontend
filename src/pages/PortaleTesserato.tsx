@@ -7,6 +7,7 @@ import {
   getPresenzeTesserato, registraPresenza
 } from '../services/api';
 import { QRCodeSVG } from 'qrcode.react';
+import { formatDate } from '../utils/date';
 
 interface Tesserato {
   id: number; nome: string; cognome: string; data_nascita: string;
@@ -191,7 +192,7 @@ const PortaleTesserato: React.FC = () => {
               <span className="font-medium">
                 {visitaMedica.giorni <= 0
                   ? 'Visita medica SCADUTA — rinnova subito!'
-                  : `Visita medica scade tra ${visitaMedica.giorni} giorni (${visitaMedica.data})`}
+                  : `Visita medica scade tra ${visitaMedica.giorni} giorni (${formatDate(visitaMedica.data)})`}
               </span>
             </div>
           )}
@@ -300,7 +301,7 @@ const PortaleTesserato: React.FC = () => {
                 }
               </div>
               <div className="bg-gray-50 rounded-xl p-4 mb-4 grid grid-cols-2 gap-3 text-sm">
-                {[['Nome', tesserato?.nome], ['Cognome', tesserato?.cognome], ['Data nascita', tesserato?.data_nascita], ['Codice Fiscale', tesserato?.codice_fiscale]].map(([l, v]) => (
+                {[['Nome', tesserato?.nome], ['Cognome', tesserato?.cognome], ['Data nascita', tesserato?.data_nascita ? formatDate(tesserato.data_nascita) : undefined], ['Codice Fiscale', tesserato?.codice_fiscale]].map(([l, v]) => (
                   <div key={l as string}><span className="text-gray-400 text-xs block">{l}</span><strong className="text-gray-800">{v || '-'}</strong></div>
                 ))}
               </div>
@@ -348,7 +349,7 @@ const PortaleTesserato: React.FC = () => {
                   <div><p className="text-blue-300 text-xs">Sport</p><p className="text-white font-bold">{tesserato?.sport || '—'}</p></div>
                   <div><p className="text-blue-300 text-xs">Scadenza</p>
                     <p className={`font-bold ${giorniAllaScadenza() !== null && giorniAllaScadenza()! <= 30 ? 'text-red-300' : 'text-white'}`}>
-                      {tesserato?.data_scadenza_tessera || '—'}
+                      {tesserato?.data_scadenza_tessera ? formatDate(tesserato.data_scadenza_tessera) : '—'}
                     </p>
                   </div>
                 </div>
@@ -368,8 +369,8 @@ const PortaleTesserato: React.FC = () => {
                         <p className="text-sm font-semibold text-gray-700">Certificato medico sportivo</p>
                         <p className={`text-sm ${scaduto ? 'text-red-600 font-bold' : inScadenza ? 'text-yellow-700 font-bold' : 'text-gray-500'}`}>
                           {scaduto
-                            ? `Scaduto il ${tesserato.data_scadenza_certificato_medico}`
-                            : `Valido fino al ${tesserato.data_scadenza_certificato_medico}${inScadenza ? ` (${giorni} giorni)` : ''}`}
+                            ? `Scaduto il ${formatDate(tesserato.data_scadenza_certificato_medico)}`
+                            : `Valido fino al ${formatDate(tesserato.data_scadenza_certificato_medico)}${inScadenza ? ` (${giorni} giorni)` : ''}`}
                         </p>
                       </div>
                     </div>
@@ -644,7 +645,7 @@ const PortaleTesserato: React.FC = () => {
                           <p className="text-xs text-gray-400">{d.nome_file}</p>
                           {d.data_scadenza && (
                             <p className={`text-xs mt-1 ${scad !== null && scad <= 0 ? 'text-red-500 font-medium' : scad !== null && scad <= 30 ? 'text-yellow-600' : 'text-gray-400'}`}>
-                              {scad !== null && scad <= 0 ? '⚠️ Scaduto' : `Scade: ${d.data_scadenza}`}
+                              {scad !== null && scad <= 0 ? '⚠️ Scaduto' : `Scade: ${formatDate(d.data_scadenza)}`}
                             </p>
                           )}
                         </div>
@@ -806,7 +807,7 @@ const PortaleTesserato: React.FC = () => {
                     {scaduti.map(p => (
                       <div key={p.id} className="flex justify-between items-center py-2 border-b border-red-100 last:border-0">
                         <div>
-                          <p className="text-sm font-medium text-red-700">Scaduto il {p.data_scadenza}</p>
+                          <p className="text-sm font-medium text-red-700">Scaduto il {formatDate(p.data_scadenza)}</p>
                         </div>
                         <p className="font-bold text-red-600 text-lg">€ {p.importo.toFixed(2)}</p>
                       </div>
@@ -833,7 +834,7 @@ const PortaleTesserato: React.FC = () => {
                             <p className={`text-xs mt-0.5 ${
                               giorniMancanti <= 7 ? 'text-red-500 font-medium' :
                               giorniMancanti <= 30 ? 'text-orange-500' : 'text-gray-400'}`}>
-                              Scade {giorniMancanti === 0 ? 'oggi' : giorniMancanti === 1 ? 'domani' : `tra ${giorniMancanti} giorni`} · {p.data_scadenza}
+                              Scade {giorniMancanti === 0 ? 'oggi' : giorniMancanti === 1 ? 'domani' : `tra ${giorniMancanti} giorni`} · {formatDate(p.data_scadenza)}
                             </p>
                           </div>
                           <p className="font-bold text-gray-800 text-lg">€ {p.importo.toFixed(2)}</p>
@@ -859,7 +860,7 @@ const PortaleTesserato: React.FC = () => {
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-700">Quota pagata</p>
-                          <p className="text-xs text-gray-400">Scadenza: {p.data_scadenza}</p>
+                          <p className="text-xs text-gray-400">Scadenza: {formatDate(p.data_scadenza)}</p>
                         </div>
                         <p className="font-bold text-green-600">€ {p.importo.toFixed(2)}</p>
                       </div>

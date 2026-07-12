@@ -14,6 +14,7 @@ interface Evento {
   ora_fine?: string;
   luogo?: string;
   note?: string;
+  ricorrente_id?: number;
 }
 interface Gruppo { id: number; nome: string; }
 interface Tesserato { id: number; nome: string; cognome: string; }
@@ -264,6 +265,12 @@ const Presenze: React.FC = () => {
                               <p className="text-xs text-gray-400 mt-0.5">
                                 {gruppi.find(g => g.id === e.gruppo_id)?.nome || '-'}
                               </p>
+                              {e.ricorrente_id && (
+                                <a href="/calendario" onClick={ev => ev.stopPropagation()}
+                                  className="text-xs text-blue-500 hover:underline mt-0.5 inline-block">
+                                  🔁 Evento ricorrente · gestisci in blocco da Attività
+                                </a>
+                              )}
                             </div>
                             <span className={`text-white text-xs px-2 py-0.5 rounded ${tipoColore[e.tipo] || 'bg-gray-500'}`}>
                               {e.tipo}

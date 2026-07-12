@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { formatDate } from '../utils/date';
 import {
   getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, eliminaTesseratoDefinitivo, getTuttiTesserati, riattivaTesserato,
   getGruppi, getGruppiTesserato, aggiornaGruppiTesserato,
   getGenitori, creaGenitore, aggiornaGenitore,
   caricaFoto, getDocumenti, caricaDocumento, eliminaDocumento,
-  getPagamentiTesserato, registraIncasso
+  getPagamentiTesserato, registraIncasso, eliminaPagamento, eliminaPagamentiNonPagatiTesserato
 } from '../services/api';
 
 interface Tesserato {
@@ -138,6 +139,29 @@ const Tesserati: React.FC = () => {
       const resPag = await getPagamentiTesserato(mostraDettaglio.id);
       setPagamentiTesserato(resPag.data);
     }
+  };
+
+  const handleEliminaPagamentoTesserato = async (pagamentoId: number) => {
+    if (!mostraDettaglio) return;
+    if (!window.confirm('Eliminare questo pagamento? L\'operazione non può essere annullata.')) return;
+    await eliminaPagamento(pagamentoId);
+    const resPag = await getPagamentiTesserato(mostraDettaglio.id);
+    setPagamentiTesserato(resPag.data);
+  };
+
+  const handleEliminaTuttiNonPagati = async () => {
+    if (!mostraDettaglio) return;
+    const nonPagati = pagamentiTesserato.filter(p => !p.pagato);
+    if (nonPagati.length === 0) return;
+    if (!window.confirm(
+      `Stai per eliminare TUTTI i ${nonPagati.length} pagamenti non ancora pagati di ${mostraDettaglio.nome} ${mostraDettaglio.cognome}.\n\n` +
+      `Questa operazione è irreversibile e utile ad esempio se sono stati creati per errore. I pagamenti già incassati NON verranno toccati.\n\n` +
+      `Vuoi continuare?`
+    )) return;
+    const res = await eliminaPagamentiNonPagatiTesserato(mostraDettaglio.id);
+    const resPag = await getPagamentiTesserato(mostraDettaglio.id);
+    setPagamentiTesserato(resPag.data);
+    alert(`Eliminati ${res.data.eliminati} pagamenti non pagati.`);
   };
 
   const handleSubmit = async () => {
@@ -607,10 +631,10 @@ Sei sicuro?`)) {
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Dati anagrafici</h3>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {[
-                      ['CF', mostraDettaglio.codice_fiscale], ['Data nascita', mostraDettaglio.data_nascita],
+                      ['CF', mostraDettaglio.codice_fiscale], ['Data nascita', formatDate(mostraDettaglio.data_nascita)],
                       ['Email', mostraDettaglio.email], ['Telefono', mostraDettaglio.telefono],
                       ['Cellulare', mostraDettaglio.cellulare], ['Categoria', mostraDettaglio.categoria],
-                      ['Tessera', mostraDettaglio.cod_tessera], ['Scad. tessera', mostraDettaglio.data_scadenza_tessera],
+                      ['Tessera', mostraDettaglio.cod_tessera], ['Scad. tessera', mostraDettaglio.data_scadenza_tessera ? formatDate(mostraDettaglio.data_scadenza_tessera) : ''],
                     ].map(([label, val]) => val ? (
                       <div key={label as string}>
                         <span className="text-gray-500 text-xs">{label}</span>
@@ -620,7 +644,7 @@ Sei sicuro?`)) {
                     {mostraDettaglio.data_scadenza_certificato_medico && (
                       <div>
                         <span className="text-gray-500 text-xs">Scad. certificato medico</span>
-                        <p className="font-medium">{mostraDettaglio.data_scadenza_certificato_medico}</p>
+                        <p className="font-medium">{formatDate(mostraDettaglio.data_scadenza_certificato_medico)}</p>
                         <BadgeScadenza data={mostraDettaglio.data_scadenza_certificato_medico} />
                       </div>
                     )}
@@ -637,7 +661,7 @@ Sei sicuro?`)) {
                           <div>
                             <span className="font-medium">{d.tipo}</span>
                             <span className="text-gray-500 ml-2 text-xs">{d.nome_file}</span>
-                            {d.data_scadenza && <span className="text-orange-500 ml-2 text-xs">scad. {d.data_scadenza}</span>}
+                            {d.data_scadenza && <span className="text-orange-500 ml-2 text-xs">scad. {formatDate(d.data_scadenza)}</span>}
                           </div>
                           <div className="flex gap-3">
                             <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">
@@ -684,7 +708,14 @@ Sei sicuro?`)) {
 
                 {/* SCADENZE PAGAMENTI */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">💳 Scadenze pagamenti</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700">💳 Scadenze pagamenti</h3>
+                    {pagamentiTesserato.some(p => !p.pagato) && (
+                      <button onClick={handleEliminaTuttiNonPagati} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                        🗑 Elimina tutti i non pagati
+                      </button>
+                    )}
+                  </div>
                   {pagamentiTesserato.length === 0 ? (
                     <p className="text-gray-400 text-sm">Nessun pagamento associato a questo tesserato</p>
                   ) : (
@@ -697,7 +728,7 @@ Sei sicuro?`)) {
                           }`}>
                             <div>
                               <span className="font-medium">{p.descrizione || `Tariffa #${p.tariffa_id}`}</span>
-                              <span className="text-gray-500 ml-2 text-xs">scad. {p.data_scadenza}</span>
+                              <span className="text-gray-500 ml-2 text-xs">scad. {formatDate(p.data_scadenza)}</span>
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="font-bold">€ {Number(p.importo).toFixed(2)}</span>
@@ -707,9 +738,14 @@ Sei sicuro?`)) {
                                 {p.pagato ? 'Pagato' : scaduto ? 'Scaduto' : 'In attesa'}
                               </span>
                               {!p.pagato && (
-                                <button onClick={() => handleIncassoTesserato(p.id)} className="text-green-600 hover:text-green-800 text-xs font-medium">
-                                  Incassa
-                                </button>
+                                <>
+                                  <button onClick={() => handleIncassoTesserato(p.id)} className="text-green-600 hover:text-green-800 text-xs font-medium">
+                                    Incassa
+                                  </button>
+                                  <button onClick={() => handleEliminaPagamentoTesserato(p.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                                    Elimina
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>
