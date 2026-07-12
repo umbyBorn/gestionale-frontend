@@ -110,14 +110,15 @@ export const getEventi = () => api.get('/eventi/');
 export const creaEvento = (data: any) => api.post('/eventi/', data);
 export const modificaEvento = (eventoId: number, data: any) => api.put(`/eventi/${eventoId}`, data);
 export const eliminaEvento = (eventoId: number) => api.delete(`/eventi/${eventoId}`);
-export const eliminaOccorrenza = (eventoId: number) => api.delete(`/eventi/${eventoId}/occorrenza`);
+export const eliminaOccorrenza = (eventoId: number, forzaConPresenze = false) =>
+  api.delete(`/eventi/${eventoId}/occorrenza?forza_con_presenze=${forzaConPresenze}`);
 
 // ---- EVENTI RICORRENTI (creazione/modifica/eliminazione in blocco) ----
 export const getEventiRicorrenti = () => api.get('/eventi-ricorrenti/');
 export const creaEventoRicorrente = (data: any) => api.post('/eventi-ricorrenti/', data);
 export const modificaEventoRicorrente = (id: number, data: any) => api.put(`/eventi-ricorrenti/${id}`, data);
-export const eliminaEventoRicorrente = (id: number, eliminaFuturi = true) =>
-  api.delete(`/eventi-ricorrenti/${id}?elimina_futuri=${eliminaFuturi}`);
+export const eliminaEventoRicorrente = (id: number, eliminaFuturi = true, forzaConPresenze = false) =>
+  api.delete(`/eventi-ricorrenti/${id}?elimina_futuri=${eliminaFuturi}&forza_con_presenze=${forzaConPresenze}`);
 export const getPresenzeEvento = (eventoId: number) => api.get(`/eventi/${eventoId}/presenze`);
 export const registraPresenza = (data: any) => api.post('/presenze/', data);
 
@@ -174,6 +175,8 @@ export const caricaDocumento = (tesseratoId: number, tipo: string, file: File, d
 export const eliminaDocumento = (documentoId: number) => api.delete(`/tesserati/documenti/${documentoId}`);
 
 export const eliminaTesseratoDefinitivo = (id: number) => api.delete(`/tesserati/${id}/definitivo`);
+export const eliminaTesseratiInBlocco = (tesserato_ids: number[]) =>
+  api.post('/tesserati/elimina-in-blocco', { tesserato_ids });
 
 // ---- IMPORTAZIONE ----
 export const importaTesserati = (file: File) => {

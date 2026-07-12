@@ -119,10 +119,21 @@ const Calendario: React.FC = () => {
     }
   };
 
-  const handleEliminaOccorrenza = async (eventoId: number) => {
-    if (!window.confirm('Eliminare questa singola occorrenza?')) return;
+  const handleEliminaOccorrenza = async (eventoId: number, forza = false) => {
+    if (!forza && !window.confirm('Eliminare questa singola occorrenza?')) return;
     try {
-      await eliminaOccorrenza(eventoId);
+      const res = await eliminaOccorrenza(eventoId, forza);
+      if (res.data?.eliminato === false) {
+        if (window.confirm(
+          'Questo evento ha già delle presenze registrate.\n\n' +
+          'Se lo elimini, verranno eliminate anche le presenze collegate e questa azione non è reversibile.\n\n' +
+          'Vuoi eliminarlo comunque?'
+        )) {
+          await handleEliminaOccorrenza(eventoId, true);
+          return;
+        }
+        return;
+      }
       carica();
       setGiornoSelezionato(null);
       setEventoAzione(null);
@@ -157,20 +168,30 @@ const Calendario: React.FC = () => {
     }
   };
 
-  const handleEliminaSerieFutura = async (e: EventoCalendario) => {
+  const handleEliminaSerieFutura = async (e: EventoCalendario, forza = false) => {
     if (!e.ricorrente_id) return;
-    if (!window.confirm(
+    if (!forza && !window.confirm(
       'Stai per eliminare questa e TUTTE le occorrenze future di questo evento ricorrente.\n\n' +
-      'Le occorrenze passate (già svolte, con eventuali presenze registrate) NON verranno toccate.\n\n' +
+      'Gli eventi che hanno già presenze registrate NON verranno toccati (te lo chiederò separatamente).\n\n' +
       'Vuoi continuare?'
     )) return;
     try {
-      const res = await eliminaEventoRicorrente(e.ricorrente_id, true);
+      const res = await eliminaEventoRicorrente(e.ricorrente_id, true, forza);
       setGiornoSelezionato(null);
       setEventoAzione(null);
       carica();
-      const n = res.data?.occorrenze_eliminate;
-      if (typeof n === 'number') alert(`Eliminate ${n} occorrenze future.`);
+      const eliminati = res.data?.occorrenze_eliminate ?? 0;
+      const saltati = res.data?.saltate_con_presenze ?? 0;
+      if (saltati > 0) {
+        if (window.confirm(
+          `Eliminate ${eliminati} occorrenze. ${saltati} eventi NON sono stati eliminati perché hanno già presenze registrate.\n\n` +
+          `Vuoi eliminare anche questi ${saltati} eventi? Le presenze collegate andranno perse e l'azione non è reversibile.`
+        )) {
+          await handleEliminaSerieFutura(e, true);
+        }
+      } else {
+        alert(`Eliminate ${eliminati} occorrenze future.`);
+      }
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione della serie di eventi');
     }

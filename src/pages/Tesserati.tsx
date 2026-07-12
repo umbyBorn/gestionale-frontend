@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { formatDate } from '../utils/date';
+import { useAuth } from '../context/AuthContext';
 import {
-  getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, eliminaTesseratoDefinitivo, getTuttiTesserati, riattivaTesserato,
+  getTesserati, creaTesserato, aggiornaTesserato, eliminaTesserato, eliminaTesseratoDefinitivo, eliminaTesseratiInBlocco, getTuttiTesserati, riattivaTesserato,
   getGruppi, getGruppiTesserato, aggiornaGruppiTesserato,
   getGenitori, creaGenitore, aggiornaGenitore,
   caricaFoto, getDocumenti, caricaDocumento, eliminaDocumento,
@@ -57,12 +58,17 @@ const BadgeScadenza: React.FC<{ data: string; giorniAvviso?: number }> = ({ data
 const SEZIONI = ['Anagrafica', 'Residenza', 'Tessera', 'Gruppi', 'Genitore'];
 
 const Tesserati: React.FC = () => {
+  const { ruolo } = useAuth();
   const [tesserati, setTesserati] = useState<Tesserato[]>([]);
   const [gruppi, setGruppi] = useState<Gruppo[]>([]);
   const [genitori, setGenitori] = useState<Genitore[]>([]);
   const [loading, setLoading] = useState(true);
   const [mostraForm, setMostraForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [mostraEliminaBlocco, setMostraEliminaBlocco] = useState(false);
+  const [passoEliminaBlocco, setPassoEliminaBlocco] = useState<1 | 2>(1);
+  const [confermaTestoBlocco, setConfermaTestoBlocco] = useState('');
+  const [eliminandoBlocco, setEliminandoBlocco] = useState(false);
   const [ricerca, setRicerca] = useState('');
   const gruppoFromUrl = new URLSearchParams(window.location.search).get('gruppo') || '';
   const [filtroGruppo, setFiltroGruppo] = useState(gruppoFromUrl);
@@ -221,6 +227,22 @@ Sei sicuro?`)) {
     }
   };
 
+  const handleConfermaEliminaBlocco = async () => {
+    if (confermaTestoBlocco.trim().toUpperCase() !== 'ELIMINA') return;
+    setEliminandoBlocco(true);
+    try {
+      const ids = filtrati.map(t => t.id);
+      const res = await eliminaTesseratiInBlocco(ids);
+      setMostraEliminaBlocco(false);
+      caricaTutti();
+      alert(`Eliminati definitivamente ${res.data.eliminati} tesserati.`);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione in blocco');
+    } finally {
+      setEliminandoBlocco(false);
+    }
+  };
+
   const handleCaricaFoto = async () => {
     if (!uploadFoto || !mostraDettaglio) return;
     await caricaFoto(mostraDettaglio.id, uploadFoto);
@@ -306,9 +328,19 @@ Sei sicuro?`)) {
   return (
     <div className="bg-gray-100 min-h-full">
       <main className="p-6">
-        <input type="text" placeholder="Cerca per nome, cognome o CF..."
-          value={ricerca} onChange={e => setRicerca(e.target.value)}
-          className="w-full max-w-md border border-gray-300 rounded px-3 py-2 mb-6 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
+          <input type="text" placeholder="Cerca per nome, cognome o CF..."
+            value={ricerca} onChange={e => setRicerca(e.target.value)}
+            className="w-full max-w-md border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          {ruolo === 'amministratore' && (
+            <button
+              onClick={() => { setPassoEliminaBlocco(1); setConfermaTestoBlocco(''); setMostraEliminaBlocco(true); }}
+              className="md:ml-auto bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded text-sm font-medium whitespace-nowrap"
+            >
+              🗑 Elimina tesserati visualizzati ({filtrati.length})
+            </button>
+          )}
+        </div>
 
         {/* FILTRI */}
         <div className="bg-white rounded-lg shadow p-4 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -752,6 +784,69 @@ Sei sicuro?`)) {
                   </a>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ELIMINAZIONE IN BLOCCO DEI TESSERATI VISUALIZZATI (solo amministratore) */}
+        {mostraEliminaBlocco && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg border-t-4 border-red-600">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">⚠️</span>
+                <h2 className="text-lg font-bold text-red-700">Eliminazione in blocco</h2>
+              </div>
+
+              {passoEliminaBlocco === 1 ? (
+                <>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Stai per eliminare <strong>DEFINITIVAMENTE</strong> tutti i <strong>{filtrati.length} tesserati attualmente visualizzati</strong> con
+                    i filtri correnti (documenti, pagamenti e presenze collegate verranno eliminati insieme a loro).
+                  </p>
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 mb-4 bg-gray-50">
+                    {filtrati.slice(0, 50).map(t => (
+                      <p key={t.id} className="text-xs text-gray-600 py-0.5">{t.cognome} {t.nome}</p>
+                    ))}
+                    {filtrati.length > 50 && <p className="text-xs text-gray-400 pt-1">...e altri {filtrati.length - 50}</p>}
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Questa operazione <strong>non può essere annullata</strong>. Se hai applicato un filtro sbagliato, chiudi questa finestra e correggilo prima di procedere.
+                  </p>
+                  <div className="flex gap-3 justify-end">
+                    <button onClick={() => setMostraEliminaBlocco(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annulla</button>
+                    <button onClick={() => setPassoEliminaBlocco(2)} className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+                      Continua →
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Ultima conferma: stai per eliminare <strong>{filtrati.length} tesserati</strong> in modo permanente.
+                  </p>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Per confermare, scrivi <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">ELIMINA</span> qui sotto:
+                  </p>
+                  <input
+                    type="text"
+                    value={confermaTestoBlocco}
+                    onChange={e => setConfermaTestoBlocco(e.target.value)}
+                    placeholder="Scrivi ELIMINA per confermare"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-4"
+                    autoFocus
+                  />
+                  <div className="flex gap-3 justify-end">
+                    <button onClick={() => setPassoEliminaBlocco(1)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">← Indietro</button>
+                    <button
+                      onClick={handleConfermaEliminaBlocco}
+                      disabled={confermaTestoBlocco.trim().toUpperCase() !== 'ELIMINA' || eliminandoBlocco}
+                      className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {eliminandoBlocco ? 'Eliminazione in corso...' : `Elimina definitivamente ${filtrati.length} tesserati`}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

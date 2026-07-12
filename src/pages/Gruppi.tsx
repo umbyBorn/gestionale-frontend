@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getGruppi, creaGruppo, aggiornaGruppo, eliminaGruppo, getTesseratiGruppo } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface Gruppo {
   id: number;
@@ -34,6 +35,7 @@ const GRADIENTI = [
 ];
 
 const Gruppi: React.FC = () => {
+  const { ruolo } = useAuth();
   const [gruppi, setGruppi] = useState<Gruppo[]>([]);
   const [loading, setLoading] = useState(true);
   const [mostraForm, setMostraForm] = useState(false);
@@ -89,6 +91,23 @@ const Gruppi: React.FC = () => {
       await eliminaGruppo(id);
       caricaGruppi();
     }
+  };
+
+  const handleEliminaDaModifica = async () => {
+    if (!editingId) return;
+    const gruppoCorrente = gruppi.find(g => g.id === editingId);
+    const nTesserati = gruppoCorrente?.num_tesserati ?? 0;
+    if (!window.confirm(
+      `Stai per eliminare il gruppo "${gruppoCorrente?.nome}".\n\n` +
+      `⚠️ I ${nTesserati} tesserati attualmente in questo gruppo NON verranno eliminati: ` +
+      `resteranno regolarmente tesserati, verranno solo scollegati da questo gruppo.\n\n` +
+      `Vuoi continuare?`
+    )) return;
+    await eliminaGruppo(editingId);
+    setMostraForm(false);
+    setEditingId(null);
+    setForm({ nome: '', descrizione: '' });
+    caricaGruppi();
   };
 
   const eta = (dataNascita?: string) => {
@@ -196,9 +215,16 @@ const Gruppi: React.FC = () => {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={3} />
               </div>
-              <div className="flex gap-3 justify-end">
-                <button onClick={() => setMostraForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annulla</button>
-                <button onClick={handleSubmit} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">Salva</button>
+              <div className="flex items-center justify-between gap-3">
+                {editingId && ruolo === 'amministratore' ? (
+                  <button onClick={handleEliminaDaModifica} className="px-3 py-2 text-sm text-red-600 hover:text-red-800 font-medium">
+                    🗑 Elimina gruppo
+                  </button>
+                ) : <span />}
+                <div className="flex gap-3 justify-end">
+                  <button onClick={() => setMostraForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annulla</button>
+                  <button onClick={handleSubmit} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">Salva</button>
+                </div>
               </div>
             </div>
           </div>
