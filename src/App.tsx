@@ -59,8 +59,8 @@ const App: React.FC = () => {
           <Route path="/messaggi" element={<RouteGuard titolo="Messaggi" sezione="messaggi"><Messaggi /></RouteGuard>} />
           <Route path="/prima-nota" element={<RouteGuard titolo="Prima nota" sezione="pagamenti"><PrimaNota /></RouteGuard>} />
           <Route path="/rendiconto" element={<RouteGuard titolo="Rendiconto" sezione="pagamenti"><Rendiconto /></RouteGuard>} />
-          {process.env.REACT_APP_LOCALE === 'true' && (
-            <Route path="/sincronizza" element={<RouteGuard titolo="Sincronizza"><Sincronizza /></RouteGuard>} />
+          {(process.env.REACT_APP_LOCALE === 'true' || window.location.hostname === '127.0.0.1') && (
+            <Route path="/sincronizza" element={<Sincronizza />} />
           )}
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
           <Route path="/documenti-societari" element={<RouteGuard titolo="Documenti societari"><DocumentiSocietari /></RouteGuard>} />

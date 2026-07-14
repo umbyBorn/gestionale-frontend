@@ -87,7 +87,7 @@ const MENU: VoceMenu[] = [
       { label: 'Documenti societari', path: '/documenti-societari' },
     ],
   },
-  ...(process.env.REACT_APP_LOCALE === 'true' ? [{
+  ...((process.env.REACT_APP_LOCALE === 'true' || window.location.hostname === '127.0.0.1') ? [{
     id: 'sincronizza',
     label: 'Sincronizza',
     icona: '🔄',
