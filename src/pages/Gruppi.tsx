@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { getGruppi, creaGruppo, aggiornaGruppo, eliminaGruppo, getTesseratiGruppo } from '../services/api';
+import {
+  getGruppi, creaGruppo, aggiornaGruppo, eliminaGruppo, getTesseratiGruppo,
+  getTesserati, getTesseratiIdsGruppo, aggiungiTesseratoAGruppo, rimuoviTesseratoDaGruppo,
+} from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 interface Gruppo {
@@ -44,6 +47,15 @@ const Gruppi: React.FC = () => {
   const [gruppoSelezionato, setGruppoSelezionato] = useState<Gruppo | null>(null);
   const [tesseratiGruppo, setTesseratiGruppo] = useState<Tesserato[]>([]);
   const [loadingTesserati, setLoadingTesserati] = useState(false);
+  const [ordinamento, setOrdinamento] = useState<{ campo: 'nome' | 'cognome' | 'eta'; direzione: 'asc' | 'desc' }>({ campo: 'cognome', direzione: 'asc' });
+
+  // Pannello "Aggiungi tesserati"
+  const [mostraAggiungi, setMostraAggiungi] = useState(false);
+  const [tuttiTesserati, setTuttiTesserati] = useState<Tesserato[]>([]);
+  const [idsNelGruppo, setIdsNelGruppo] = useState<number[]>([]);
+  const [ricercaTesserato, setRicercaTesserato] = useState('');
+  const [ordinamentoAggiungi, setOrdinamentoAggiungi] = useState<{ campo: 'nome' | 'cognome' | 'eta'; direzione: 'asc' | 'desc' }>({ campo: 'cognome', direzione: 'asc' });
+  const [operazioneInCorsoId, setOperazioneInCorsoId] = useState<number | null>(null);
 
   const caricaGruppi = () => {
     getGruppi().then((res) => {
@@ -121,6 +133,64 @@ const Gruppi: React.FC = () => {
     if (nonAncoraCompleanno) anni -= 1;
     return anni;
   };
+
+  const cambiaOrdinamento = (campo: 'nome' | 'cognome' | 'eta', corrente: typeof ordinamento, setter: (o: any) => void) => {
+    if (corrente.campo === campo) setter({ campo, direzione: corrente.direzione === 'asc' ? 'desc' : 'asc' });
+    else setter({ campo, direzione: 'asc' });
+  };
+
+  const ordina = <T extends Tesserato>(lista: T[], ord: typeof ordinamento): T[] => {
+    const copia = [...lista];
+    copia.sort((a, b) => {
+      let cmp = 0;
+      if (ord.campo === 'eta') {
+        const ea = typeof eta(a.data_nascita) === 'number' ? (eta(a.data_nascita) as number) : -1;
+        const eb = typeof eta(b.data_nascita) === 'number' ? (eta(b.data_nascita) as number) : -1;
+        cmp = ea - eb;
+      } else {
+        cmp = (a[ord.campo] || '').localeCompare(b[ord.campo] || '');
+      }
+      return ord.direzione === 'asc' ? cmp : -cmp;
+    });
+    return copia;
+  };
+
+  const apriAggiungiTesserati = async () => {
+    setMostraAggiungi(true);
+    setRicercaTesserato('');
+    const [tutti, ids] = await Promise.all([getTesserati(), getTesseratiIdsGruppo(gruppoSelezionato!.id)]);
+    setTuttiTesserati(tutti.data);
+    setIdsNelGruppo(ids.data);
+  };
+
+  const handleToggleTesserato = async (tesseratoId: number, presente: boolean) => {
+    if (!gruppoSelezionato) return;
+    setOperazioneInCorsoId(tesseratoId);
+    try {
+      if (presente) {
+        await rimuoviTesseratoDaGruppo(gruppoSelezionato.id, tesseratoId);
+        setIdsNelGruppo(ids => ids.filter(id => id !== tesseratoId));
+      } else {
+        await aggiungiTesseratoAGruppo(gruppoSelezionato.id, tesseratoId);
+        setIdsNelGruppo(ids => [...ids, tesseratoId]);
+      }
+      // Ricarica la lista membri e il conteggio nella card, senza chiudere il pannello
+      const res = await getTesseratiGruppo(gruppoSelezionato.id);
+      setTesseratiGruppo(res.data);
+      caricaGruppi();
+    } finally {
+      setOperazioneInCorsoId(null);
+    }
+  };
+
+  const tesseratiFiltratiPerAggiunta = ordina(
+    tuttiTesserati.filter(t => {
+      if (!ricercaTesserato.trim()) return true;
+      const q = ricercaTesserato.toLowerCase();
+      return t.nome.toLowerCase().includes(q) || t.cognome.toLowerCase().includes(q);
+    }),
+    ordinamentoAggiungi
+  );
 
   const totaleTesserati = gruppi.reduce((acc, g) => acc + (g.num_tesserati || 0), 0);
 
@@ -242,6 +312,12 @@ const Gruppi: React.FC = () => {
                 <button onClick={() => setGruppoSelezionato(null)} className="text-white/80 hover:text-white text-xl">✕</button>
               </div>
 
+              <div className="px-6 py-3 border-b flex justify-end">
+                <button onClick={apriAggiungiTesserati} className="bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-800">
+                  + Aggiungi tesserati
+                </button>
+              </div>
+
               <div className="overflow-y-auto flex-1">
                 {loadingTesserati ? (
                   <p className="p-6 text-gray-500">Caricamento...</p>
@@ -255,16 +331,22 @@ const Gruppi: React.FC = () => {
                     <thead className="bg-gray-50 border-b sticky top-0">
                       <tr>
                         <th className="px-4 py-3 text-left text-gray-600">Foto</th>
-                        <th className="px-4 py-3 text-left text-gray-600">Nome</th>
-                        <th className="px-4 py-3 text-left text-gray-600">Cognome</th>
-                        <th className="px-4 py-3 text-left text-gray-600">Età</th>
+                        <th className="px-4 py-3 text-left text-gray-600 cursor-pointer select-none" onClick={() => cambiaOrdinamento('nome', ordinamento, setOrdinamento)}>
+                          Nome {ordinamento.campo === 'nome' && (ordinamento.direzione === 'asc' ? '▲' : '▼')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-gray-600 cursor-pointer select-none" onClick={() => cambiaOrdinamento('cognome', ordinamento, setOrdinamento)}>
+                          Cognome {ordinamento.campo === 'cognome' && (ordinamento.direzione === 'asc' ? '▲' : '▼')}
+                        </th>
+                        <th className="px-4 py-3 text-left text-gray-600 cursor-pointer select-none" onClick={() => cambiaOrdinamento('eta', ordinamento, setOrdinamento)}>
+                          Età {ordinamento.campo === 'eta' && (ordinamento.direzione === 'asc' ? '▲' : '▼')}
+                        </th>
                         <th className="px-4 py-3 text-left text-gray-600">Categoria</th>
                         <th className="px-4 py-3 text-left text-gray-600">Contatto</th>
                         <th className="px-4 py-3 text-left text-gray-600">Scheda</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {tesseratiGruppo.map((t, i) => (
+                      {ordina(tesseratiGruppo, ordinamento).map((t, i) => (
                         <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="px-4 py-2">
                             {t.foto_url
@@ -278,9 +360,14 @@ const Gruppi: React.FC = () => {
                           <td className="px-4 py-2">{t.categoria || '-'}</td>
                           <td className="px-4 py-2 text-xs">{t.cellulare || t.telefono || t.email || '-'}</td>
                           <td className="px-4 py-2">
-                            <a href={`/tesserati?gruppo=${encodeURIComponent(gruppoSelezionato.nome)}`} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                              Vai alla scheda →
-                            </a>
+                            <div className="flex items-center gap-3">
+                              <a href={`/tesserati?gruppo=${encodeURIComponent(gruppoSelezionato.nome)}`} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                                Vai alla scheda →
+                              </a>
+                              <button onClick={() => handleToggleTesserato(t.id, true)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                                Rimuovi
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -292,6 +379,78 @@ const Gruppi: React.FC = () => {
               <div className="px-6 py-3 border-t flex justify-between items-center bg-gray-50">
                 <span className="text-xs text-gray-400">Clicca "Vai alla scheda" per aprire la scheda completa del tesserato</span>
                 <button onClick={() => setGruppoSelezionato(null)} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">Chiudi</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PANNELLO AGGIUNGI TESSERATI: lista completa filtrabile e ordinabile */}
+        {mostraAggiungi && gruppoSelezionato && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+              <div className="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
+                <h3 className="font-bold text-gray-800">Aggiungi tesserati a "{gruppoSelezionato.nome}"</h3>
+                <button onClick={() => setMostraAggiungi(false)} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
+              </div>
+
+              <div className="px-6 py-3 border-b flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text" placeholder="Cerca per nome o cognome..."
+                  value={ricercaTesserato} onChange={e => setRicercaTesserato(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={`${ordinamentoAggiungi.campo}-${ordinamentoAggiungi.direzione}`}
+                  onChange={e => {
+                    const [campo, direzione] = e.target.value.split('-') as ['nome' | 'cognome' | 'eta', 'asc' | 'desc'];
+                    setOrdinamentoAggiungi({ campo, direzione });
+                  }}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="cognome-asc">Cognome A→Z</option>
+                  <option value="cognome-desc">Cognome Z→A</option>
+                  <option value="nome-asc">Nome A→Z</option>
+                  <option value="nome-desc">Nome Z→A</option>
+                  <option value="eta-asc">Età crescente</option>
+                  <option value="eta-desc">Età decrescente</option>
+                </select>
+              </div>
+
+              <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+                {tesseratiFiltratiPerAggiunta.length === 0 ? (
+                  <p className="p-6 text-gray-400 text-sm text-center">Nessun tesserato trovato</p>
+                ) : tesseratiFiltratiPerAggiunta.map(t => {
+                  const presente = idsNelGruppo.includes(t.id);
+                  return (
+                    <div key={t.id} className="flex items-center justify-between px-6 py-2.5">
+                      <div className="flex items-center gap-3">
+                        {t.foto_url
+                          ? <img src={t.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                          : <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">{t.nome[0]}{t.cognome[0]}</div>
+                        }
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{t.cognome} {t.nome}</p>
+                          <p className="text-xs text-gray-500">{eta(t.data_nascita)} anni {t.categoria ? `· ${t.categoria}` : ''}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleToggleTesserato(t.id, presente)}
+                        disabled={operazioneInCorsoId === t.id}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-50 ${
+                          presente ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-blue-700 text-white hover:bg-blue-800'
+                        }`}
+                      >
+                        {operazioneInCorsoId === t.id ? '...' : presente ? 'Rimuovi' : '+ Aggiungi'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="px-6 py-3 border-t bg-gray-50 flex justify-end">
+                <button onClick={() => setMostraAggiungi(false)} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">
+                  Fatto
+                </button>
               </div>
             </div>
           </div>

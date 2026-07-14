@@ -84,6 +84,7 @@ const MENU: VoceMenu[] = [
     soloAdmin: true,
     sottovoci: [
       { label: 'Utenti e permessi', path: '/admin' },
+      { label: 'Documenti societari', path: '/documenti-societari' },
     ],
   },
   ...(process.env.REACT_APP_LOCALE === 'true' ? [{

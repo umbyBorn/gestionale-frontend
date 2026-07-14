@@ -6,7 +6,8 @@ import {
   getGruppi, getGruppiTesserato, aggiornaGruppiTesserato,
   getGenitori, creaGenitore, aggiornaGenitore,
   caricaFoto, getDocumenti, caricaDocumento, eliminaDocumento,
-  getPagamentiTesserato, registraIncasso, eliminaPagamento, eliminaPagamentiNonPagatiTesserato
+  getPagamentiTesserato, registraIncasso, eliminaPagamento, eliminaPagamentiNonPagatiTesserato,
+  esportaLibroSoci, scaricaModuloAdesione, scaricaModuloTesseramento
 } from '../services/api';
 
 interface Tesserato {
@@ -332,10 +333,22 @@ Sei sicuro?`)) {
           <input type="text" placeholder="Cerca per nome, cognome o CF..."
             value={ricerca} onChange={e => setRicerca(e.target.value)}
             className="w-full max-w-md border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <button
+            onClick={apriNuovo}
+            className="bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-800 whitespace-nowrap"
+          >
+            + Nuovo tesserato
+          </button>
+          <button
+            onClick={() => esportaLibroSoci()}
+            className="md:ml-auto bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-2 rounded text-sm font-medium whitespace-nowrap"
+          >
+            📑 Esporta Libro Soci
+          </button>
           {ruolo === 'amministratore' && (
             <button
               onClick={() => { setPassoEliminaBlocco(1); setConfermaTestoBlocco(''); setMostraEliminaBlocco(true); }}
-              className="md:ml-auto bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded text-sm font-medium whitespace-nowrap"
+              className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded text-sm font-medium whitespace-nowrap"
             >
               🗑 Elimina tesserati visualizzati ({filtrati.length})
             </button>
@@ -729,6 +742,28 @@ Sei sicuro?`)) {
                         Carica documento
                       </button>
                     )}
+                  </div>
+                </div>
+
+                {/* MODULI PRECOMPILATI */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">📋 Moduli precompilati</h3>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Generati con i dati anagrafici già presenti (e del genitore, se il tesserato è minorenne). Da stampare e far firmare.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => scaricaModuloAdesione(mostraDettaglio.id, `adesione_${mostraDettaglio.cognome}_${mostraDettaglio.nome}.pdf`)}
+                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded text-sm font-medium"
+                    >
+                      📄 Modulo Adesione
+                    </button>
+                    <button
+                      onClick={() => scaricaModuloTesseramento(mostraDettaglio.id, `tesseramento_${mostraDettaglio.cognome}_${mostraDettaglio.nome}.pdf`)}
+                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded text-sm font-medium"
+                    >
+                      📄 Lettera di Tesseramento
+                    </button>
                   </div>
                 </div>
 

@@ -139,6 +139,11 @@ export const aggiornaPartecipazione = (id: number, data: any) => api.put(`/parte
 
 export const getTesseratiGruppo = (gruppoId: number) =>
   api.get(`/messaggi/gruppi/${gruppoId}/tesserati`);
+export const getTesseratiIdsGruppo = (gruppoId: number) => api.get(`/gruppi/${gruppoId}/tesserati-ids`);
+export const aggiungiTesseratoAGruppo = (gruppoId: number, tesseratoId: number) =>
+  api.post(`/gruppi/${gruppoId}/tesserati/${tesseratoId}`);
+export const rimuoviTesseratoDaGruppo = (gruppoId: number, tesseratoId: number) =>
+  api.delete(`/gruppi/${gruppoId}/tesserati/${tesseratoId}`);
 
 export const inviaMessaggio = (dati: any) =>
   api.post('/messaggi/invia', dati);
@@ -220,3 +225,82 @@ export const getStatisticheTesserato = (tesseratoId: number) => api.get(`/tesser
 export const getPresenzeTesserato = (tesseratoId: number) => api.get(`/tesserati/${tesseratoId}/presenze`);
 export const aggiornaPresenza = (presenzaId: number, data: any) => api.put(`/presenze/${presenzaId}`, data);
 export const annullaAssenza = (eventoId: number, tesseratoId: number) => api.delete(`/eventi/${eventoId}/presenze/${tesseratoId}`);
+
+// ---- ESPORTAZIONI EXCEL ----
+const scaricaBlobExcel = async (path: string, nomeFile: string) => {
+  const res = await api.get(path, { responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', nomeFile);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+export const esportaLibroSoci = () => scaricaBlobExcel('/tesserati/export/libro-soci', 'libro_soci.xlsx');
+export const esportaPrimaNotaExcel = (dataDa?: string, dataA?: string) => {
+  const params = new URLSearchParams();
+  if (dataDa) params.set('data_da', dataDa);
+  if (dataA) params.set('data_a', dataA);
+  const qs = params.toString();
+  return scaricaBlobExcel(`/prima-nota/export/excel${qs ? `?${qs}` : ''}`, 'prima_nota.xlsx');
+};
+
+// ---- MODULI PRECOMPILATI (adesione, tesseramento) ----
+const scaricaBlobPdf = async (path: string, nomeFile: string) => {
+  const res = await api.get(path, { responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', nomeFile);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+export const scaricaModuloAdesione = (tesseratoId: number, nomeFile: string) =>
+  scaricaBlobPdf(`/moduli/adesione/${tesseratoId}/pdf`, nomeFile);
+export const scaricaModuloTesseramento = (tesseratoId: number, nomeFile: string) =>
+  scaricaBlobPdf(`/moduli/tesseramento/${tesseratoId}/pdf`, nomeFile);
+
+// ---- DOCUMENTI SOCIETARI ----
+export const getDocumentiSocietari = () => api.get('/documenti-societari/');
+export const caricaDocumentoSocietario = (nome: string, file: File, categoria?: string, note?: string) => {
+  const fd = new FormData();
+  fd.append('nome', nome);
+  fd.append('file', file);
+  if (categoria) fd.append('categoria', categoria);
+  if (note) fd.append('note', note);
+  return api.post('/documenti-societari/', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+export const eliminaDocumentoSocietario = (id: number) => api.delete(`/documenti-societari/${id}`);
+
+// ---- RICEVUTE PAGAMENTO ----
+export const inviaRicevutaEmail = (pagamentoId: number) => api.get(`/ricevute/${pagamentoId}/invia-email`);
+export const scaricaRicevutaPdf = async (pagamentoId: number, nomeFile?: string) => {
+  const res = await api.get(`/ricevute/${pagamentoId}/pdf`, { responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', nomeFile || `ricevuta_${pagamentoId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+// ---- RICEVUTE EROGAZIONE LIBERALE ----
+export const getRicevuteDonazione = () => api.get('/ricevute/erogazione-liberale/');
+export const creaRicevutaDonazione = (data: any) => api.post('/ricevute/erogazione-liberale/', data);
+export const scaricaRicevutaDonazionePdf = async (id: number) => {
+  const res = await api.get(`/ricevute/erogazione-liberale/${id}/pdf`, { responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `ricevuta_donazione_${id}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};

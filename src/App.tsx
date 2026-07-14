@@ -13,6 +13,7 @@ import Assemblee from './pages/Assemblee';
 import Calendario from './pages/Calendario';
 import Messaggi from './pages/Messaggi';
 import Admin from './pages/Admin';
+import DocumentiSocietari from './pages/DocumentiSocietari';
 import PortaleTesserato from './pages/PortaleTesserato';
 import FormIscrizione from './pages/FormIscrizione';
 import Iscrizioni from './pages/Iscrizioni';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
             <Route path="/sincronizza" element={<RouteGuard titolo="Sincronizza"><Sincronizza /></RouteGuard>} />
           )}
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
+          <Route path="/documenti-societari" element={<RouteGuard titolo="Documenti societari"><DocumentiSocietari /></RouteGuard>} />
           <Route path="/iscrizioni" element={<RouteGuard titolo="Iscrizioni online"><Iscrizioni /></RouteGuard>} />
           <Route path="/iscriviti/:token" element={<FormIscrizione />} />
           <Route path="/import" element={<RouteGuard titolo="Importazione" sezione="tesserati"><Importazione /></RouteGuard>} />

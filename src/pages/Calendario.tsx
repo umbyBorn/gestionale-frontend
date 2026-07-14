@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  getGruppi, getEventi, creaEventoRicorrente, eliminaOccorrenza,
+  getGruppi, getEventi, creaEvento, creaEventoRicorrente, eliminaOccorrenza,
   modificaEvento, modificaEventoRicorrente, eliminaEventoRicorrente,
 } from '../services/api';
 import { formatDate } from '../utils/date';
@@ -59,6 +59,10 @@ const Calendario: React.FC = () => {
   const [ricercaEvento, setRicercaEvento] = useState('');
   const [eventoAzione, setEventoAzione] = useState<EventoCompleto | null>(null);
   const [mostraFormRicorrente, setMostraFormRicorrente] = useState(false);
+  const [mostraFormSingolo, setMostraFormSingolo] = useState(false);
+  const [formSingolo, setFormSingolo] = useState({
+    gruppo_id: 0, tipo: 'allenamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', luogo: '', note: '',
+  });
   const [form, setForm] = useState({
     gruppo_id: 0, tipo: 'allenamento', titolo: '', ora_inizio: '', ora_fine: '',
     luogo: '', giorni_settimana: [] as number[], data_inizio: '', data_fine: ''
@@ -116,6 +120,21 @@ const Calendario: React.FC = () => {
       carica();
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Errore durante la creazione dell\'evento ricorrente');
+    }
+  };
+
+  const handleCreaSingolo = async () => {
+    if (!formSingolo.gruppo_id || !formSingolo.titolo || !formSingolo.data) {
+      alert('Compila almeno gruppo, titolo e data');
+      return;
+    }
+    try {
+      await creaEvento(formSingolo);
+      setMostraFormSingolo(false);
+      setFormSingolo({ gruppo_id: 0, tipo: 'allenamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', luogo: '', note: '' });
+      carica();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore durante la creazione dell\'evento');
     }
   };
 
@@ -178,6 +197,7 @@ const Calendario: React.FC = () => {
       const res = await eliminaEventoRicorrente(e.ricorrente_id, true, forza);
       const eliminati = res.data?.occorrenze_eliminate ?? 0;
       const saltati = res.data?.saltate_con_presenze ?? 0;
+      const totaleSerie = res.data?.totale_eventi_nella_serie_prima_dell_eliminazione ?? null;
       carica();
       if (saltati > 0) {
         // mostra un modal esplicito invece di un confirm() annidato, facile da chiudere per sbaglio
@@ -185,7 +205,15 @@ const Calendario: React.FC = () => {
       } else {
         setGiornoSelezionato(null);
         setEventoAzione(null);
-        alert(`Eliminate ${eliminati} occorrenze future.`);
+        if (eliminati === 0) {
+          alert(
+            `Nessuna occorrenza futura eliminata.\n\n` +
+            `Diagnostica: la serie "${e.titolo}" (ricorrente_id ${e.ricorrente_id}) contiene in totale ${totaleSerie} eventi nel database, ` +
+            `ma nessuno con data odierna o futura è stato trovato. Probabilmente tutte le occorrenze di questa serie sono già passate.`
+          );
+        } else {
+          alert(`Eliminate ${eliminati} occorrenze future.`);
+        }
       }
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione della serie di eventi');
@@ -269,9 +297,14 @@ const Calendario: React.FC = () => {
             <h1 className="text-xl font-bold text-gray-800">Attività</h1>
             <p className="text-sm text-gray-500 mt-0.5">Calendario allenamenti, partite e raduni</p>
           </div>
-          <button onClick={() => setMostraFormRicorrente(true)} className="bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition w-fit">
-            + Nuovo evento ricorrente
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => { setFormSingolo(f => ({ ...f, data: giornoSelezionato || '' })); setMostraFormSingolo(true); }} className="bg-blue-100 text-blue-700 px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-200 transition w-fit">
+              + Nuovo evento singolo
+            </button>
+            <button onClick={() => setMostraFormRicorrente(true)} className="bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition w-fit">
+              + Nuovo evento ricorrente
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -455,6 +488,73 @@ const Calendario: React.FC = () => {
         </div>
 
         {/* Form evento ricorrente */}
+        {/* Nuovo evento singolo (non ricorrente) */}
+        {mostraFormSingolo && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg">
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Nuovo evento singolo</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gruppo</label>
+                  <select value={formSingolo.gruppo_id} onChange={e => setFormSingolo({ ...formSingolo, gruppo_id: parseInt(e.target.value) })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value={0}>Seleziona gruppo</option>
+                    {gruppi.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                    <select value={formSingolo.tipo} onChange={e => setFormSingolo({ ...formSingolo, tipo: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="allenamento">Allenamento</option>
+                      <option value="partita">Partita</option>
+                      <option value="raduno">Raduno</option>
+                      <option value="altro">Altro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" value={formSingolo.data} onChange={e => setFormSingolo({ ...formSingolo, data: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Titolo</label>
+                  <input type="text" value={formSingolo.titolo} onChange={e => setFormSingolo({ ...formSingolo, titolo: e.target.value })}
+                    placeholder="Es. Torneo amichevole, Recupero allenamento..." className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora inizio</label>
+                    <input type="time" value={formSingolo.ora_inizio} onChange={e => setFormSingolo({ ...formSingolo, ora_inizio: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ora fine</label>
+                    <input type="time" value={formSingolo.ora_fine} onChange={e => setFormSingolo({ ...formSingolo, ora_fine: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Luogo</label>
+                  <input type="text" value={formSingolo.luogo} onChange={e => setFormSingolo({ ...formSingolo, luogo: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
+                  <textarea value={formSingolo.note} onChange={e => setFormSingolo({ ...formSingolo, note: e.target.value })} rows={2}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6 justify-end">
+                <button onClick={() => setMostraFormSingolo(false)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button onClick={handleCreaSingolo} className="px-4 py-2 bg-blue-700 text-white rounded text-sm hover:bg-blue-800">Crea evento</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {mostraFormRicorrente && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-screen overflow-y-auto">

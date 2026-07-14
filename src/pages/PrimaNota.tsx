@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getMovimenti, creaMovimento, aggiornaMovimento, eliminaMovimento } from '../services/api';
+import { getMovimenti, creaMovimento, aggiornaMovimento, eliminaMovimento, esportaPrimaNotaExcel } from '../services/api';
 import { formatDate } from '../utils/date';
 
 interface Movimento {
@@ -111,6 +111,9 @@ const PrimaNota: React.FC = () => {
             <p className="text-sm text-gray-500 mt-0.5">Registro di tutte le entrate e uscite dell'associazione</p>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => esportaPrimaNotaExcel()} className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-100 transition">
+              📑 Esporta Excel
+            </button>
             <button onClick={() => apriNuovo('entrata')} className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-700 transition">
               + Entrata
             </button>

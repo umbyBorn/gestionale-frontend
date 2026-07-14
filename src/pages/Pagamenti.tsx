@@ -5,6 +5,8 @@ import {
   getTariffe, creaTariffa, getTesserati, registraIncasso,
   generaPianoScadenze, creaPagamentoGruppo, getGruppi,
   modificaBatch, eliminaBatch,
+  scaricaRicevutaPdf, inviaRicevutaEmail,
+  getRicevuteDonazione, creaRicevutaDonazione, scaricaRicevutaDonazionePdf,
 } from '../services/api';
 
 interface Pagamento {
@@ -28,6 +30,7 @@ const TAB = [
   { id: 'piano', label: '🗓️ Genera piano quote' },
   { id: 'ad-hoc', label: '🎽 Pagamento di gruppo' },
   { id: 'tariffe', label: '🏷️ Tariffe' },
+  { id: 'donazioni', label: '❤️ Erogazioni liberali' },
 ] as const;
 type TabId = typeof TAB[number]['id'];
 
@@ -105,6 +108,23 @@ const Pagamenti: React.FC = () => {
     if (metodo && ['contanti', 'bonifico', 'altro'].includes(metodo)) {
       await registraIncasso(id, metodo);
       carica();
+    }
+  };
+
+  const handleScaricaRicevuta = async (id: number) => {
+    try {
+      await scaricaRicevutaPdf(id);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore nella generazione della ricevuta');
+    }
+  };
+
+  const handleInviaRicevuta = async (id: number) => {
+    try {
+      const res = await inviaRicevutaEmail(id);
+      alert(`Ricevuta inviata a ${res.data.email}`);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore nell\'invio della ricevuta via email');
     }
   };
 
@@ -335,6 +355,16 @@ const Pagamenti: React.FC = () => {
                                   Incassa
                                 </button>
                               )}
+                              {p.pagato && (
+                                <>
+                                  <button onClick={() => handleScaricaRicevuta(p.id)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+                                    📄 Ricevuta
+                                  </button>
+                                  <button onClick={() => handleInviaRicevuta(p.id)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+                                    ✉️ Invia
+                                  </button>
+                                </>
+                              )}
                               <button onClick={() => setPagamentoInModifica(p)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
                                 Modifica
                               </button>
@@ -387,6 +417,9 @@ const Pagamenti: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* ============ EROGAZIONI LIBERALI (donazioni) ============ */}
+            {tab === 'donazioni' && <RicevuteDonazione />}
           </>
         )}
 
@@ -837,3 +870,102 @@ const PagamentoAdHocGruppo: React.FC<{
 };
 
 export default Pagamenti;
+
+
+// ============================================================
+// RICEVUTE EROGAZIONE LIBERALE (donazioni)
+// ============================================================
+interface RicevutaDonazione { id: number; nome_donatore: string; importo: number; data: string; causale?: string; creato_il: string; }
+
+const RicevuteDonazione: React.FC = () => {
+  const [ricevute, setRicevute] = useState<RicevutaDonazione[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ nome_donatore: '', importo: 0, data: new Date().toISOString().split('T')[0], causale: '' });
+  const [inviando, setInviando] = useState(false);
+
+  const carica = () => {
+    getRicevuteDonazione().then(res => { setRicevute(res.data); setLoading(false); });
+  };
+  useEffect(() => { carica(); }, []);
+
+  const handleCrea = async () => {
+    if (!form.nome_donatore || !form.importo || !form.data) { alert('Compila nome, importo e data'); return; }
+    setInviando(true);
+    try {
+      const res = await creaRicevutaDonazione(form);
+      setForm({ nome_donatore: '', importo: 0, data: new Date().toISOString().split('T')[0], causale: '' });
+      carica();
+      // scarica subito il PDF appena generato
+      await scaricaRicevutaDonazionePdf(res.data.id);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore nella creazione della ricevuta');
+    } finally {
+      setInviando(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="font-bold text-gray-800 mb-1">Nuova ricevuta per erogazione liberale</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Per donazioni volontarie a sostegno dell'associazione (non collegate a una quota o a un tesserato specifico).
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nome del sostenitore</label>
+            <input type="text" value={form.nome_donatore} onChange={e => setForm({ ...form, nome_donatore: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Importo (€)</label>
+              <input type="number" value={form.importo} onChange={e => setForm({ ...form, importo: parseFloat(e.target.value) })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+              <input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Causale aggiuntiva (opzionale)</label>
+            <input type="text" value={form.causale} onChange={e => setForm({ ...form, causale: e.target.value })}
+              placeholder="Es. a sostegno del torneo di Capodanno" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <button onClick={handleCrea} disabled={inviando}
+          className="w-full mt-5 bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50">
+          {inviando ? 'Generazione...' : '❤️ Genera ricevuta e scarica PDF'}
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="font-bold text-gray-800 mb-4">Registro ricevute emesse</h2>
+        {loading ? (
+          <p className="text-gray-500 text-sm">Caricamento...</p>
+        ) : ricevute.length === 0 ? (
+          <p className="text-gray-400 text-sm">Nessuna ricevuta di erogazione liberale emessa</p>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {ricevute.map(r => (
+              <div key={r.id} className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium text-gray-800">N. {String(r.id).padStart(4, '0')} — {r.nome_donatore}</p>
+                  <p className="text-xs text-gray-500">{formatDate(r.data)}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-green-700">€ {Number(r.importo).toFixed(2)}</span>
+                  <button onClick={() => scaricaRicevutaDonazionePdf(r.id)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+                    📄 PDF
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
