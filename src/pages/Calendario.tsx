@@ -439,7 +439,7 @@ const Calendario: React.FC = () => {
                 {eventiGiornoSelezionato.length === 0 ? (
                   <p className="text-gray-400 text-sm">Nessun evento in questo giorno</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
                     {eventiGiornoSelezionato.map(e => (
                       <div key={e.id} className="p-3 rounded-lg border-l-4 border-blue-300 bg-gray-50">
                         <div className="flex justify-between items-start gap-2">

@@ -46,6 +46,8 @@ const Pagamenti: React.FC = () => {
   const [filtroMese, setFiltroMese] = useState<string>('');
   const [filtroAnno, setFiltroAnno] = useState<string>('');
   const [filtroTesseratoId, setFiltroTesseratoId] = useState<string>('');
+  const [filtroTariffaNome, setFiltroTariffaNome] = useState<string>('');
+  const [batchAperti, setBatchAperti] = useState(false);
 
   const [mostraFormPagamento, setMostraFormPagamento] = useState(false);
   const [mostraFormTariffa, setMostraFormTariffa] = useState(false);
@@ -167,6 +169,7 @@ const Pagamenti: React.FC = () => {
     if (filtroMese && p.data_scadenza && String(new Date(p.data_scadenza).getMonth() + 1) !== filtroMese) return false;
     if (filtroAnno && p.data_scadenza && String(new Date(p.data_scadenza).getFullYear()) !== filtroAnno) return false;
     if (filtroTesseratoId && String(p.tesserato_id) !== filtroTesseratoId) return false;
+    if (filtroTariffaNome && nomeTariffa(p.tariffa_id) !== filtroTariffaNome) return false;
     if (ricerca) {
       const q = ricerca.toLowerCase();
       const testoTesserato = nomeTesserato(p.tesserato_id).toLowerCase();
@@ -174,7 +177,7 @@ const Pagamenti: React.FC = () => {
       if (!testoTesserato.includes(q) && !testoVoce.includes(q)) return false;
     }
     return true;
-  });
+  }).sort((a, b) => (a.data_scadenza || '').localeCompare(b.data_scadenza || ''));
 
   // Anni effettivamente presenti tra le scadenze, per popolare il combo "Anno"
   const anniDisponibili = Array.from(new Set(
@@ -269,18 +272,26 @@ const Pagamenti: React.FC = () => {
         </div>
 
         {/* TAB NAV */}
-        <div className="flex gap-1 mb-5 overflow-x-auto bg-white rounded-xl p-1 shadow-sm w-fit">
-          {TAB.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                tab === t.id ? 'bg-blue-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <div className="flex gap-1 overflow-x-auto bg-white rounded-xl p-1 shadow-sm w-fit">
+            {TAB.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                  tab === t.id ? 'bg-blue-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setMostraFormPagamento(true)}
+            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
+          >
+            Genera pagamento SINGOLO
+          </button>
         </div>
 
         {messaggio && (
@@ -298,30 +309,37 @@ const Pagamenti: React.FC = () => {
               <div>
                 {batches.length > 0 && (
                   <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Gruppi generati in blocco</h3>
-                    <p className="text-xs text-gray-500 mb-3">
-                      Pagamenti creati insieme (piano scadenze o pagamento di gruppo). Puoi modificarli o eliminarli tutti insieme se creati per errore.
-                    </p>
-                    <div className="space-y-2">
-                      {batches.map(b => (
-                        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                          <div className="text-sm">
-                            <span className="font-medium text-gray-800">{b.nome}</span>
-                            <span className="text-gray-500 ml-2 text-xs">
-                              {b.count} pagamenti · {b.countNonPagati} da incassare · totale € {b.totale.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex gap-3">
-                            <button onClick={() => apriModificaBatch(b)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                              ✏️ Modifica non pagati
-                            </button>
-                            <button onClick={() => handleEliminaBatch(b)} className="text-red-500 hover:text-red-700 text-xs font-medium">
-                              🗑 Elimina non pagati
-                            </button>
-                          </div>
+                    <button onClick={() => setBatchAperti(v => !v)} className="w-full flex items-center justify-between text-left">
+                      <h3 className="text-sm font-semibold text-gray-700">📦 Gruppi generati in blocco ({batches.length})</h3>
+                      <span className="text-gray-400 text-xs">{batchAperti ? '▲ nascondi' : '▼ mostra'}</span>
+                    </button>
+                    {batchAperti && (
+                      <>
+                        <p className="text-xs text-gray-500 mt-3 mb-3">
+                          Pagamenti creati insieme (piano scadenze o pagamento di gruppo). Puoi modificarli o eliminarli tutti insieme se creati per errore.
+                        </p>
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                          {batches.map(b => (
+                            <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                              <div className="text-sm">
+                                <span className="font-medium text-gray-800">{b.nome}</span>
+                                <span className="text-gray-500 ml-2 text-xs">
+                                  {b.count} pagamenti · {b.countNonPagati} da incassare · totale € {b.totale.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex gap-3">
+                                <button onClick={() => apriModificaBatch(b)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                                  ✏️ Modifica non pagati
+                                </button>
+                                <button onClick={() => handleEliminaBatch(b)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                                  🗑 Elimina non pagati
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -361,13 +379,16 @@ const Pagamenti: React.FC = () => {
                       <option key={t.id} value={String(t.id)}>{t.cognome} {t.nome}</option>
                     ))}
                   </select>
-                  <button
-                    onClick={() => setMostraFormPagamento(true)}
-                    className="ml-auto bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
-                  >
-                    + Pagamento singolo
-                  </button>
                 </div>
+
+                {filtroTariffaNome && (
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                      Tariffa: {filtroTariffaNome}
+                    </span>
+                    <button onClick={() => setFiltroTariffaNome('')} className="text-xs text-gray-400 hover:text-gray-600">✕ rimuovi filtro</button>
+                  </div>
+                )}
 
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                   <table className="w-full text-sm">
@@ -457,7 +478,13 @@ const Pagamenti: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {tariffe.map(t => (
                     <div key={t.id} className="bg-white rounded-2xl shadow-sm p-4">
-                      <p className="font-bold text-gray-800">{t.nome}</p>
+                      <button
+                        onClick={() => { setFiltroTariffaNome(t.nome); setFiltro('tutti'); setTab('scadenzario'); }}
+                        className="font-bold text-blue-700 hover:text-blue-900 hover:underline text-left"
+                        title="Vedi lo scadenzario dei tesserati con questa tariffa"
+                      >
+                        {t.nome}
+                      </button>
                       <p className="text-2xl font-bold text-blue-700 mt-1">€ {Number(t.importo).toFixed(2)}</p>
                       {t.categoria && <p className="text-xs text-gray-400 mt-1">{t.categoria}</p>}
                       <div className="flex gap-3 mt-3 pt-3 border-t border-gray-100">
