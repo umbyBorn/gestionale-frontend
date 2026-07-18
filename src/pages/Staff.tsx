@@ -113,10 +113,23 @@ const Staff: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (editingId) await aggiornaStaff(editingId, form);
-    else await creaStaff(form);
-    setMostraForm(false);
-    carica();
+    const obbligatori: [string, string][] = [
+      ['nome', 'Nome'], ['cognome', 'Cognome'], ['data_nascita', 'Data di nascita'],
+      ['codice_fiscale', 'Codice Fiscale'], ['ruolo', 'Ruolo'], ['data_inizio', 'Data inizio'],
+    ];
+    const mancante = obbligatori.find(([campo]) => !(form as any)[campo]);
+    if (mancante) {
+      alert(`Il campo "${mancante[1]}" è obbligatorio.`);
+      return;
+    }
+    try {
+      if (editingId) await aggiornaStaff(editingId, form);
+      else await creaStaff(form);
+      setMostraForm(false);
+      carica();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore nel salvataggio del socio. Controlla i dati inseriti.');
+    }
   };
 
   const handleElimina = async (id: number) => {
