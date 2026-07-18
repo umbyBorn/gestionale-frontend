@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { formatDate } from '../utils/date';
 import {
   getPagamenti, creaPagamento, aggiornaPagamento, eliminaPagamento,
-  getTariffe, creaTariffa, modificaTariffa, eliminaTariffa, getTesserati, registraIncasso,
+  getTariffe, creaTariffa, getTesserati, registraIncasso,
   generaPianoScadenze, creaPagamentoGruppo, getGruppi,
   modificaBatch, eliminaBatch,
   scaricaRicevutaPdf, inviaRicevutaEmail,
@@ -43,15 +43,9 @@ const Pagamenti: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<'tutti' | 'pagati' | 'scaduti'>('tutti');
   const [ricerca, setRicerca] = useState('');
-  const [filtroMese, setFiltroMese] = useState<string>('');
-  const [filtroAnno, setFiltroAnno] = useState<string>('');
-  const [filtroTesseratoId, setFiltroTesseratoId] = useState<string>('');
-  const [filtroTariffaNome, setFiltroTariffaNome] = useState<string>('');
-  const [batchAperti, setBatchAperti] = useState(false);
 
   const [mostraFormPagamento, setMostraFormPagamento] = useState(false);
   const [mostraFormTariffa, setMostraFormTariffa] = useState(false);
-  const [tariffaInModifica, setTariffaInModifica] = useState<number | null>(null);
   const [pagamentoInModifica, setPagamentoInModifica] = useState<Pagamento | null>(null);
   const [messaggio, setMessaggio] = useState('');
   const [batchInModifica, setBatchInModifica] = useState<{ id: string; nome: string; count: number } | null>(null);
@@ -103,28 +97,10 @@ const Pagamenti: React.FC = () => {
   };
 
   const handleCreaTariffa = async () => {
-    if (tariffaInModifica) {
-      await modificaTariffa(tariffaInModifica, formTariffa);
-    } else {
-      await creaTariffa(formTariffa);
-    }
+    await creaTariffa(formTariffa);
     setMostraFormTariffa(false);
-    setTariffaInModifica(null);
     setFormTariffa({ nome: '', importo: 0, categoria: '' });
     carica();
-  };
-
-  const handleAvviaModificaTariffa = (t: Tariffa) => {
-    setTariffaInModifica(t.id);
-    setFormTariffa({ nome: t.nome, importo: t.importo, categoria: t.categoria || '' });
-    setMostraFormTariffa(true);
-  };
-
-  const handleEliminaTariffa = async (id: number) => {
-    if (window.confirm('Disattivare questa tariffa? Non sarà più selezionabile per nuovi piani quote, ma i pagamenti già generati restano invariati.')) {
-      await eliminaTariffa(id);
-      carica();
-    }
   };
 
   const handleIncasso = async (id: number) => {
@@ -166,10 +142,6 @@ const Pagamenti: React.FC = () => {
   const filtrati = pagamenti.filter((p) => {
     if (filtro === 'pagati' && !p.pagato) return false;
     if (filtro === 'scaduti' && (p.pagato || p.data_scadenza >= oggi)) return false;
-    if (filtroMese && p.data_scadenza && String(new Date(p.data_scadenza).getMonth() + 1) !== filtroMese) return false;
-    if (filtroAnno && p.data_scadenza && String(new Date(p.data_scadenza).getFullYear()) !== filtroAnno) return false;
-    if (filtroTesseratoId && String(p.tesserato_id) !== filtroTesseratoId) return false;
-    if (filtroTariffaNome && nomeTariffa(p.tariffa_id) !== filtroTariffaNome) return false;
     if (ricerca) {
       const q = ricerca.toLowerCase();
       const testoTesserato = nomeTesserato(p.tesserato_id).toLowerCase();
@@ -177,14 +149,7 @@ const Pagamenti: React.FC = () => {
       if (!testoTesserato.includes(q) && !testoVoce.includes(q)) return false;
     }
     return true;
-  }).sort((a, b) => (a.data_scadenza || '').localeCompare(b.data_scadenza || ''));
-
-  // Anni effettivamente presenti tra le scadenze, per popolare il combo "Anno"
-  const anniDisponibili = Array.from(new Set(
-    pagamenti.filter(p => p.data_scadenza).map(p => new Date(p.data_scadenza).getFullYear())
-  )).sort((a, b) => b - a);
-
-  const MESI_LABEL = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  });
   const totalePagato = pagamenti.filter(p => p.pagato).reduce((a, p) => a + Number(p.importo), 0);
   const totaleDaIncassare = pagamenti.filter(p => !p.pagato).reduce((a, p) => a + Number(p.importo), 0);
   const totaleScaduto = pagamenti.filter(p => !p.pagato && p.data_scadenza < oggi).reduce((a, p) => a + Number(p.importo), 0);
@@ -272,26 +237,18 @@ const Pagamenti: React.FC = () => {
         </div>
 
         {/* TAB NAV */}
-        <div className="flex flex-wrap items-center gap-3 mb-5">
-          <div className="flex gap-1 overflow-x-auto bg-white rounded-xl p-1 shadow-sm w-fit">
-            {TAB.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                  tab === t.id ? 'bg-blue-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setMostraFormPagamento(true)}
-            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
-          >
-            Genera pagamento SINGOLO
-          </button>
+        <div className="flex gap-1 mb-5 overflow-x-auto bg-white rounded-xl p-1 shadow-sm w-fit">
+          {TAB.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                tab === t.id ? 'bg-blue-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
         {messaggio && (
@@ -309,37 +266,30 @@ const Pagamenti: React.FC = () => {
               <div>
                 {batches.length > 0 && (
                   <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-                    <button onClick={() => setBatchAperti(v => !v)} className="w-full flex items-center justify-between text-left">
-                      <h3 className="text-sm font-semibold text-gray-700">📦 Gruppi generati in blocco ({batches.length})</h3>
-                      <span className="text-gray-400 text-xs">{batchAperti ? '▲ nascondi' : '▼ mostra'}</span>
-                    </button>
-                    {batchAperti && (
-                      <>
-                        <p className="text-xs text-gray-500 mt-3 mb-3">
-                          Pagamenti creati insieme (piano scadenze o pagamento di gruppo). Puoi modificarli o eliminarli tutti insieme se creati per errore.
-                        </p>
-                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                          {batches.map(b => (
-                            <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                              <div className="text-sm">
-                                <span className="font-medium text-gray-800">{b.nome}</span>
-                                <span className="text-gray-500 ml-2 text-xs">
-                                  {b.count} pagamenti · {b.countNonPagati} da incassare · totale € {b.totale.toFixed(2)}
-                                </span>
-                              </div>
-                              <div className="flex gap-3">
-                                <button onClick={() => apriModificaBatch(b)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                                  ✏️ Modifica non pagati
-                                </button>
-                                <button onClick={() => handleEliminaBatch(b)} className="text-red-500 hover:text-red-700 text-xs font-medium">
-                                  🗑 Elimina non pagati
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Gruppi generati in blocco</h3>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Pagamenti creati insieme (piano scadenze o pagamento di gruppo). Puoi modificarli o eliminarli tutti insieme se creati per errore.
+                    </p>
+                    <div className="space-y-2">
+                      {batches.map(b => (
+                        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                          <div className="text-sm">
+                            <span className="font-medium text-gray-800">{b.nome}</span>
+                            <span className="text-gray-500 ml-2 text-xs">
+                              {b.count} pagamenti · {b.countNonPagati} da incassare · totale € {b.totale.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex gap-3">
+                            <button onClick={() => apriModificaBatch(b)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                              ✏️ Modifica non pagati
+                            </button>
+                            <button onClick={() => handleEliminaBatch(b)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                              🗑 Elimina non pagati
+                            </button>
+                          </div>
                         </div>
-                      </>
-                    )}
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -362,33 +312,13 @@ const Pagamenti: React.FC = () => {
                     onChange={e => setRicerca(e.target.value)}
                     className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 max-w-xs"
                   />
-                  <select value={filtroMese} onChange={e => setFiltroMese(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                    <option value="">Tutti i mesi</option>
-                    {MESI_LABEL.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
-                  </select>
-                  <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                    <option value="">Tutti gli anni</option>
-                    {anniDisponibili.map(a => <option key={a} value={String(a)}>{a}</option>)}
-                  </select>
-                  <select value={filtroTesseratoId} onChange={e => setFiltroTesseratoId(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm max-w-[180px]">
-                    <option value="">Tutti i tesserati</option>
-                    {[...tesserati].sort((a, b) => a.cognome.localeCompare(b.cognome)).map(t => (
-                      <option key={t.id} value={String(t.id)}>{t.cognome} {t.nome}</option>
-                    ))}
-                  </select>
+                  <button
+                    onClick={() => setMostraFormPagamento(true)}
+                    className="ml-auto bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
+                  >
+                    + Pagamento singolo
+                  </button>
                 </div>
-
-                {filtroTariffaNome && (
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                      Tariffa: {filtroTariffaNome}
-                    </span>
-                    <button onClick={() => setFiltroTariffaNome('')} className="text-xs text-gray-400 hover:text-gray-600">✕ rimuovi filtro</button>
-                  </div>
-                )}
 
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                   <table className="w-full text-sm">
@@ -456,7 +386,7 @@ const Pagamenti: React.FC = () => {
 
             {/* ============ GENERA PIANO QUOTE ============ */}
             {tab === 'piano' && (
-              <GeneraPianoQuote gruppi={gruppi} tesserati={tesserati} tariffe={tariffe} onCreato={(msg) => { flash(msg); carica(); setTab('scadenzario'); }} />
+              <GeneraPianoQuote gruppi={gruppi} tesserati={tesserati} onCreato={(msg) => { flash(msg); carica(); setTab('scadenzario'); }} />
             )}
 
             {/* ============ PAGAMENTO AD HOC DI GRUPPO ============ */}
@@ -469,7 +399,7 @@ const Pagamenti: React.FC = () => {
               <div>
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => { setTariffaInModifica(null); setFormTariffa({ nome: '', importo: 0, categoria: '' }); setMostraFormTariffa(true); }}
+                    onClick={() => setMostraFormTariffa(true)}
                     className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
                   >
                     + Nuova tariffa
@@ -478,19 +408,9 @@ const Pagamenti: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {tariffe.map(t => (
                     <div key={t.id} className="bg-white rounded-2xl shadow-sm p-4">
-                      <button
-                        onClick={() => { setFiltroTariffaNome(t.nome); setFiltro('tutti'); setTab('scadenzario'); }}
-                        className="font-bold text-blue-700 hover:text-blue-900 hover:underline text-left"
-                        title="Vedi lo scadenzario dei tesserati con questa tariffa"
-                      >
-                        {t.nome}
-                      </button>
+                      <p className="font-bold text-gray-800">{t.nome}</p>
                       <p className="text-2xl font-bold text-blue-700 mt-1">€ {Number(t.importo).toFixed(2)}</p>
                       {t.categoria && <p className="text-xs text-gray-400 mt-1">{t.categoria}</p>}
-                      <div className="flex gap-3 mt-3 pt-3 border-t border-gray-100">
-                        <button onClick={() => handleAvviaModificaTariffa(t)} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Modifica</button>
-                        <button onClick={() => handleEliminaTariffa(t.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Elimina</button>
-                      </div>
                     </div>
                   ))}
                   {tariffe.length === 0 && <p className="text-gray-400 col-span-3">Nessuna tariffa creata</p>}
@@ -507,7 +427,7 @@ const Pagamenti: React.FC = () => {
         {mostraFormTariffa && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">{tariffaInModifica ? 'Modifica Tariffa' : 'Nuova Tariffa'}</h2>
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Nuova Tariffa</h2>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input type="text" value={formTariffa.nome} onChange={(e) => setFormTariffa({ ...formTariffa, nome: e.target.value })}
@@ -524,7 +444,7 @@ const Pagamenti: React.FC = () => {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="flex gap-3 justify-end">
-                <button onClick={() => { setMostraFormTariffa(false); setTariffaInModifica(null); setFormTariffa({ nome: '', importo: 0, categoria: '' }); }} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                <button onClick={() => setMostraFormTariffa(false)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
                 <button onClick={handleCreaTariffa} className="px-4 py-2 bg-blue-700 text-white rounded-lg text-sm hover:bg-blue-800">Salva</button>
               </div>
             </div>
@@ -650,15 +570,13 @@ const MESI = [
 ];
 
 const GeneraPianoQuote: React.FC<{
-  gruppi: Gruppo[]; tesserati: Tesserato[]; tariffe: Tariffa[]; onCreato: (msg: string) => void;
-}> = ({ gruppi, tesserati, tariffe, onCreato }) => {
+  gruppi: Gruppo[]; tesserati: Tesserato[]; onCreato: (msg: string) => void;
+}> = ({ gruppi, tesserati, onCreato }) => {
   const [destinatario, setDestinatario] = useState<'gruppo' | 'tutti'>('gruppo');
   const [gruppoId, setGruppoId] = useState(0);
   const [conIscrizione, setConIscrizione] = useState(true);
   const [importoIscrizione, setImportoIscrizione] = useState(50);
   const [dataIscrizione, setDataIscrizione] = useState('');
-  const [tariffaMensileId, setTariffaMensileId] = useState(0);
-  const [descrizioneMensile, setDescrizioneMensile] = useState('Pagamento mensile');
   const [importoMensile, setImportoMensile] = useState(40);
   const [meseInizio, setMeseInizio] = useState(8); // Settembre (0-indexed)
   const [meseFine, setMeseFine] = useState(5); // Giugno
@@ -666,15 +584,6 @@ const GeneraPianoQuote: React.FC<{
   const [giornoScadenza, setGiornoScadenza] = useState(5);
   const [voci, setVoci] = useState<VoceScadenza[] | null>(null);
   const [inviando, setInviando] = useState(false);
-
-  const selezionaTariffaMensile = (id: number) => {
-    setTariffaMensileId(id);
-    const t = tariffe.find(t => t.id === id);
-    if (t) {
-      setImportoMensile(t.importo);
-      setDescrizioneMensile(t.nome);
-    }
-  };
 
   const generaAnteprima = () => {
     const risultato: VoceScadenza[] = [];
@@ -687,8 +596,7 @@ const GeneraPianoQuote: React.FC<{
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const dataStr = `${anno}-${String(mese + 1).padStart(2, '0')}-${String(giornoScadenza).padStart(2, '0')}`;
-      const nomeVoce = `${descrizioneMensile} - ${MESI[mese]} ${anno}`;
-      risultato.push({ nome: nomeVoce, importo: importoMensile, data_scadenza: dataStr });
+      risultato.push({ nome: MESI[mese], importo: importoMensile, data_scadenza: dataStr });
       if (mese === meseFine) break;
       mese = (mese + 1) % 12;
       if (mese === 0) anno += 1;
@@ -782,21 +690,6 @@ const GeneraPianoQuote: React.FC<{
 
         <div className="border-t pt-4">
           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Quota mensile</label>
-          <div className="mb-3">
-            <label className="block text-xs text-gray-500 mb-1">Tariffa</label>
-            <select value={tariffaMensileId} onChange={e => selezionaTariffaMensile(parseInt(e.target.value))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-              <option value={0}>Nessuna (importo libero)</option>
-              {tariffe.map(t => <option key={t.id} value={t.id}>{t.nome} — €{t.importo}</option>)}
-            </select>
-          </div>
-          <div className="mb-3">
-            <label className="block text-xs text-gray-500 mb-1">Descrizione</label>
-            <input type="text" value={descrizioneMensile} onChange={e => setDescrizioneMensile(e.target.value)}
-              placeholder="Es. Pagamento mensile pallavolo"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            <p className="text-xs text-gray-400 mt-1">Il sistema aggiungerà automaticamente " - Mese Anno" a ogni scadenza generata (es. "{descrizioneMensile || 'Pagamento mensile'} - Ottobre 2026")</p>
-          </div>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Importo mensile (€)</label>

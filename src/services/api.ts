@@ -84,8 +84,6 @@ export const getRendiconto = (data_da?: string, data_a?: string) =>
 // ---- TARIFFE ----
 export const getTariffe = () => api.get('/tariffe/');
 export const creaTariffa = (data: any) => api.post('/tariffe/', data);
-export const modificaTariffa = (id: number, data: any) => api.put(`/tariffe/${id}`, data);
-export const eliminaTariffa = (id: number) => api.delete(`/tariffe/${id}`);
 
 // ---- STAFF ----
 export const getStaff = () => api.get('/staff/');
@@ -130,12 +128,6 @@ export const getAssemblea = (id: number) => api.get(`/assemblee/${id}`);
 export const creaAssemblea = (data: any) => api.post('/assemblee/', data);
 export const aggiornaAssemblea = (id: number, data: any) => api.put(`/assemblee/${id}`, data);
 export const eliminaAssemblea = (id: number) => api.delete(`/assemblee/${id}`);
-export const caricaVerbale = (id: number, file: File) => {
-  const form = new FormData();
-  form.append('file', file);
-  return api.post(`/assemblee/${id}/verbale`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
-};
-export const eliminaVerbale = (id: number) => api.delete(`/assemblee/${id}/verbale`);
 
 export const getPuntiAssemblea = (assembleaId: number) => api.get(`/assemblee/${assembleaId}/punti`);
 export const creaPunto = (data: any) => api.post('/punti/', data);

@@ -80,7 +80,7 @@ const DocumentiSocietari: React.FC = () => {
                   {d.note && <p className="text-xs text-gray-400 mt-1">{d.note}</p>}
                 </div>
                 <div className="flex items-center gap-4">
-                  <a href={d.url} target="_blank" rel="noreferrer" download={d.nome_file} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                  <a href={d.url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
                     📄 Apri
                   </a>
                   {isAdmin && (

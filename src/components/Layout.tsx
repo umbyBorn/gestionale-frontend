@@ -43,12 +43,23 @@ const MENU: VoceMenu[] = [
     ],
   },
   {
+    id: 'staff',
+    label: 'Staff',
+    icona: '👨‍💼',
+    sezione: 'staff',
+    sottovoci: [
+      { label: 'Elenco staff', path: '/staff' },
+      { label: 'Compensi', path: '/staff' },
+    ],
+  },
+  {
     id: 'attivita',
     label: 'Attività',
     icona: '📅',
     sottovoci: [
       { label: 'Calendario', path: '/calendario', },
       { label: 'Presenze', path: '/presenze' },
+      { label: 'Assemblee', path: '/assemblee' },
     ],
   },
   {
@@ -67,27 +78,16 @@ const MENU: VoceMenu[] = [
     path: '/iscrizioni',
   },
   {
-    id: 'societa',
-    label: 'Società',
-    icona: '🏛️',
-    sezione: 'staff',
-    sottovoci: [
-      { label: 'Staff', path: '/staff' },
-      { label: 'Assemblee', path: '/assemblee' },
-      { label: 'Libro Soci', path: '/libro-soci' },
-      { label: 'Documenti societari', path: '/documenti-societari' },
-    ],
-  },
-  {
     id: 'impostazioni',
     label: 'Impostazioni',
     icona: '⚙️',
     soloAdmin: true,
     sottovoci: [
       { label: 'Utenti e permessi', path: '/admin' },
+      { label: 'Documenti societari', path: '/documenti-societari' },
     ],
   },
-  ...((process.env.REACT_APP_LOCALE === 'true' || window.location.hostname === '127.0.0.1') ? [{
+  ...(process.env.REACT_APP_LOCALE === 'true' ? [{
     id: 'sincronizza',
     label: 'Sincronizza',
     icona: '🔄',

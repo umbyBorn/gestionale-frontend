@@ -21,7 +21,7 @@ interface Tesserato { id: number; nome: string; cognome: string; }
 interface Presenza { id: number; tesserato_id: number; presente: boolean; }
 
 const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-const GIORNI = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+const GIORNI = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 
 const Presenze: React.FC = () => {
   const [eventi, setEventi] = useState<Evento[]>([]);
@@ -91,7 +91,7 @@ const Presenze: React.FC = () => {
   // Calendario
   const primoGiorno = new Date(anno, mese, 1);
   const ultimoGiorno = new Date(anno, mese + 1, 0);
-  const offsetInizio = (() => { const d = primoGiorno.getDay(); return d === 0 ? 6 : d - 1; })();
+  const offsetInizio = primoGiorno.getDay();
 
   const eventiDelGiorno = (giorno: number) => {
     const dataStr = `${anno}-${String(mese + 1).padStart(2, '0')}-${String(giorno).padStart(2, '0')}`;

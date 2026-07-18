@@ -706,7 +706,7 @@ Sei sicuro?`)) {
                             <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">
                               {d.nome_file.toLowerCase().endsWith('.pdf') ? '📄 Apri' : '🖼 Apri'}
                             </a>
-                            <a href={d.url} download={d.nome_file} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-800 text-xs">⬇ Scarica</a>
+                            <a href={d.url} download target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-800 text-xs">⬇ Scarica</a>
                             <button onClick={() => handleEliminaDoc(d.id)} className="text-red-500 hover:text-red-700 text-xs">Elimina</button>
                           </div>
                         </div>
@@ -726,8 +726,6 @@ Sei sicuro?`)) {
                           <option>Documento di identità</option>
                           <option>Modulo iscrizione</option>
                           <option>Consenso trattamento dati</option>
-                          <option>Liberatoria foto/video</option>
-                          <option>Regolamento sociale firmato</option>
                           <option>Altro</option>
                         </select>
                       </div>
