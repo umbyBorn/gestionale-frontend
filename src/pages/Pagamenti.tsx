@@ -20,6 +20,7 @@ interface Pagamento {
   pagato: boolean;
   descrizione?: string;
   gruppo_generazione_id?: string;
+  emetti_ricevuta?: boolean;
 }
 interface Tariffa { id: number; nome: string; importo: number; categoria?: string; }
 interface Tesserato { id: number; nome: string; cognome: string; }
