@@ -58,8 +58,8 @@ export const aggiornaPagamento = (id: number, data: any) => api.put(`/pagamenti/
 export const eliminaPagamento = (id: number) => api.delete(`/pagamenti/${id}`);
 export const eliminaPagamentiNonPagatiTesserato = (tesseratoId: number) =>
   api.delete(`/pagamenti/tesserato/${tesseratoId}/non-pagati`);
-export const registraIncasso = (id: number, metodo: string) =>
-  api.put(`/pagamenti/${id}/registra-incasso?metodo=${metodo}`);
+export const registraIncasso = (id: number, metodo: string, emettiRicevuta: boolean = true) =>
+  api.put(`/pagamenti/${id}/registra-incasso?metodo=${metodo}&emetti_ricevuta=${emettiRicevuta}`);
 
 // Generazione automatica scadenze (es. Iscrizione + quote Settembre-Giugno)
 export const generaPianoScadenze = (data: any) => api.post('/pagamenti/piano-scadenze', data);
@@ -84,10 +84,30 @@ export const getRendiconto = (data_da?: string, data_a?: string) =>
 // ---- TARIFFE ----
 export const getTariffe = () => api.get('/tariffe/');
 export const creaTariffa = (data: any) => api.post('/tariffe/', data);
+export const modificaTariffa = (id: number, data: any) => api.put(`/tariffe/${id}`, data);
+export const eliminaTariffa = (id: number) => api.delete(`/tariffe/${id}`);
 
 // ---- STAFF ----
 export const getStaff = () => api.get('/staff/');
 export const creaStaff = (data: any) => api.post('/staff/', data);
+export const caricaModuloSocio = (id: number, file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post(`/staff/${id}/modulo`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+export const scaricaModuloAdesionePdf = async (id: number, minorenne: boolean, nomeFile: string) => {
+  const res = await api.get(`/staff/${id}/modulo-adesione/pdf?minorenne=${minorenne}`, { responseType: 'blob' });
+  const url = URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement('a'); a.href = url; a.download = nomeFile; a.click();
+  URL.revokeObjectURL(url);
+};
+export const scaricaTesseraPdf = async (id: number, nomeFile: string) => {
+  const res = await api.get(`/staff/${id}/tessera/pdf`, { responseType: 'blob' });
+  const url = URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement('a'); a.href = url; a.download = nomeFile; a.click();
+  URL.revokeObjectURL(url);
+};
+export const getTabulatoTessere = () => api.get('/staff/tabulato/tessere');
 export const aggiornaStaff = (id: number, data: any) => api.put(`/staff/${id}`, data);
 export const eliminaStaff = (id: number) => api.delete(`/staff/${id}`);
 export const getGruppiStaff = (id: number) => api.get(`/staff/${id}/gruppi`);
@@ -128,6 +148,12 @@ export const getAssemblea = (id: number) => api.get(`/assemblee/${id}`);
 export const creaAssemblea = (data: any) => api.post('/assemblee/', data);
 export const aggiornaAssemblea = (id: number, data: any) => api.put(`/assemblee/${id}`, data);
 export const eliminaAssemblea = (id: number) => api.delete(`/assemblee/${id}`);
+export const caricaVerbale = (id: number, file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post(`/assemblee/${id}/verbale`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+export const eliminaVerbale = (id: number) => api.delete(`/assemblee/${id}/verbale`);
 
 export const getPuntiAssemblea = (assembleaId: number) => api.get(`/assemblee/${assembleaId}/punti`);
 export const creaPunto = (data: any) => api.post('/punti/', data);

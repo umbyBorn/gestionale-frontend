@@ -5,12 +5,17 @@ import {
   getGruppiStaff, aggiornaGruppiStaff, getGruppi,
   getCompensiStaff, creaCompenso, eliminaCompenso,
   getContrattiStaff, creaContratto, eliminaContratto,
+  getTesserati, caricaModuloSocio, scaricaModuloAdesionePdf, scaricaTesseraPdf, getTabulatoTessere,
 } from '../services/api';
 
 interface Membro {
   id: number; nome: string; cognome: string; data_nascita: string; codice_fiscale: string;
+  indirizzo?: string; comune_residenza?: string;
   telefono?: string; email?: string; ruolo: string; tipo_rapporto: string; data_inizio: string; attivo: boolean;
+  numero_tessera?: number; data_emissione_tessera?: string; quota_associativa?: number; quota_pagata?: boolean;
+  path_modulo_firmato?: string;
 }
+interface TesseratoBase { id: number; nome: string; cognome: string; data_nascita: string; codice_fiscale?: string; indirizzo?: string; comune_residenza?: string; }
 interface Compenso { id: number; staff_id: number; importo: number; data_erogazione: string; descrizione?: string; totale_progressivo: number; soglia_superata: boolean; }
 interface Contratto { id: number; staff_id: number; tipo: string; data_inizio: string; data_fine?: string; importo: number; firmato: boolean; }
 interface Gruppo { id: number; nome: string; }
@@ -24,8 +29,9 @@ const TIPO_COLORE: Record<string, string> = {
 const SOGLIA_ANNUA = 5000;
 
 const formVuoto = {
-  nome: '', cognome: '', data_nascita: '', codice_fiscale: '', telefono: '', email: '',
+  nome: '', cognome: '', data_nascita: '', codice_fiscale: '', indirizzo: '', comune_residenza: '', telefono: '', email: '',
   ruolo: '', tipo_rapporto: 'volontario', data_inizio: '',
+  quota_associativa: 5, quota_pagata: false,
 };
 
 const Staff: React.FC = () => {
@@ -35,6 +41,8 @@ const Staff: React.FC = () => {
   const [mostraForm, setMostraForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(formVuoto);
+  const [tesserati, setTesserati] = useState<TesseratoBase[]>([]);
+  const [tesseratoOrigineId, setTesseratoOrigineId] = useState<string>('');
 
   // Dettaglio membro selezionato
   const [selezionato, setSelezionato] = useState<Membro | null>(null);
@@ -48,9 +56,10 @@ const Staff: React.FC = () => {
   const [formContratto, setFormContratto] = useState({ tipo: 'sportivo', data_inizio: '', data_fine: '', importo: 0, firmato: false });
 
   const carica = () => {
-    Promise.all([getStaff(), getGruppi()]).then(([s, g]) => {
+    Promise.all([getStaff(), getGruppi(), getTesserati()]).then(([s, g, t]) => {
       setStaff(s.data);
       setGruppi(g.data);
+      setTesserati(t.data);
       setLoading(false);
     });
   };
@@ -73,7 +82,25 @@ const Staff: React.FC = () => {
     setContratti(ct.data);
   };
 
-  const apriNuovo = () => { setEditingId(null); setForm(formVuoto); setMostraForm(true); };
+  const apriNuovo = () => { setEditingId(null); setForm(formVuoto); setTesseratoOrigineId(''); setMostraForm(true); };
+
+  const handleStampaTabulato = async () => {
+    const res = await getTabulatoTessere();
+    const righe = [
+      ['Numero Tessera', 'Cognome', 'Nome', 'Data di nascita', 'Data emissione', 'Quota', 'Pagata'],
+      ...res.data.map((s: any) => [
+        s.numero_tessera, s.cognome, s.nome,
+        s.data_nascita ? new Date(s.data_nascita).toLocaleDateString('it-IT') : '',
+        s.data_emissione_tessera ? new Date(s.data_emissione_tessera).toLocaleDateString('it-IT') : '',
+        s.quota_associativa ?? '', s.quota_pagata ? 'Sì' : 'No',
+      ])
+    ];
+    const csv = righe.map(r => r.map((c: any) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'tabulato_tessere_soci.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
   const apriModifica = (m: Membro) => {
     setEditingId(m.id);
     setForm({
@@ -140,12 +167,17 @@ const Staff: React.FC = () => {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">Staff</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{staff.length} membri · clicca su un nome per vedere compensi e contratti</p>
+            <h1 className="text-xl font-bold text-gray-800">Soci</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{staff.length} soci · clicca su un nome per vedere compensi, contratti e tessera</p>
           </div>
-          <button onClick={apriNuovo} className="bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition w-fit">
-            + Nuovo membro
-          </button>
+          <div className="flex gap-2">
+            <button onClick={handleStampaTabulato} className="bg-white border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition w-fit">
+              🖨️ Stampa tabulato tessere
+            </button>
+            <button onClick={apriNuovo} className="bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition w-fit">
+              + Nuovo socio
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
@@ -218,6 +250,37 @@ const Staff: React.FC = () => {
                       {t.label}
                     </button>
                   ))}
+                </div>
+
+                {/* TESSERA E MODULO ADESIONE */}
+                <div className="px-5 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-3">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Tessera N. {selezionato.numero_tessera ?? '—'}
+                    {selezionato.quota_pagata ? ' · quota pagata' : ' · quota da versare'}
+                  </span>
+                  <button onClick={() => scaricaTesseraPdf(selezionato.id, `tessera_${selezionato.cognome}.pdf`)}
+                    className="text-blue-600 hover:text-blue-800 text-xs font-medium">🪪 Scarica tessera</button>
+                  <button onClick={() => scaricaModuloAdesionePdf(selezionato.id, false, `modulo_adesione_${selezionato.cognome}.pdf`)}
+                    className="text-blue-600 hover:text-blue-800 text-xs font-medium">📄 Modulo maggiorenni</button>
+                  <button onClick={() => scaricaModuloAdesionePdf(selezionato.id, true, `modulo_adesione_minorenni_${selezionato.cognome}.pdf`)}
+                    className="text-blue-600 hover:text-blue-800 text-xs font-medium">📄 Modulo minorenni</button>
+                  {selezionato.path_modulo_firmato ? (
+                    <a href={selezionato.path_modulo_firmato} target="_blank" rel="noreferrer" className="text-green-600 hover:text-green-800 text-xs font-medium">
+                      ✅ Modulo firmato caricato
+                    </a>
+                  ) : (
+                    <label className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">
+                      + Carica modulo firmato
+                      <input type="file" accept="application/pdf" className="hidden"
+                        onChange={async (e) => {
+                          if (e.target.files?.[0]) {
+                            const res = await caricaModuloSocio(selezionato.id, e.target.files[0]);
+                            setSelezionato(res.data);
+                            carica();
+                          }
+                        }} />
+                    </label>
+                  )}
                 </div>
 
                 <div className="p-5">
@@ -316,28 +379,66 @@ const Staff: React.FC = () => {
         {mostraForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">{editingId ? 'Modifica membro' : 'Nuovo membro staff'}</h2>
+              <h2 className="text-lg font-bold text-gray-800 mb-4">{editingId ? 'Modifica socio' : 'Nuovo socio'}</h2>
+
+              {!editingId && (
+                <div className="mb-4 bg-blue-50 rounded-lg p-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Copia dati da un tesserato (facoltativo)</label>
+                  <select
+                    value={tesseratoOrigineId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setTesseratoOrigineId(id);
+                      const t = tesserati.find(x => String(x.id) === id);
+                      if (t) {
+                        setForm(f => ({
+                          ...f,
+                          nome: t.nome, cognome: t.cognome, data_nascita: t.data_nascita,
+                          codice_fiscale: t.codice_fiscale || f.codice_fiscale,
+                          indirizzo: t.indirizzo || f.indirizzo,
+                          comune_residenza: t.comune_residenza || f.comune_residenza,
+                        }));
+                      }
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">Nessuno (compila manualmente)</option>
+                    {[...tesserati].sort((a, b) => a.cognome.localeCompare(b.cognome)).map(t => (
+                      <option key={t.id} value={t.id}>{t.cognome} {t.nome}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">I dati vengono solo copiati, non resta nessun collegamento con il tesserato.</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { label: 'Nome', key: 'nome', type: 'text' },
                   { label: 'Cognome', key: 'cognome', type: 'text' },
                   { label: 'Data di nascita', key: 'data_nascita', type: 'date' },
                   { label: 'Codice Fiscale', key: 'codice_fiscale', type: 'text' },
+                  { label: 'Indirizzo', key: 'indirizzo', type: 'text' },
+                  { label: 'Comune di residenza', key: 'comune_residenza', type: 'text' },
                   { label: 'Telefono', key: 'telefono', type: 'text' },
                   { label: 'Email', key: 'email', type: 'email' },
                   { label: 'Ruolo', key: 'ruolo', type: 'text' },
                   { label: 'Data inizio', key: 'data_inizio', type: 'date' },
+                  { label: 'Quota associativa (€)', key: 'quota_associativa', type: 'number' },
                 ].map((campo) => (
                   <div key={campo.key}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{campo.label}</label>
                     <input
                       type={campo.type}
                       value={(form as any)[campo.key]}
-                      onChange={(e) => setForm({ ...form, [campo.key]: e.target.value })}
+                      onChange={(e) => setForm({ ...form, [campo.key]: campo.type === 'number' ? parseFloat(e.target.value) : e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 ))}
+                <div className="col-span-2 flex items-center gap-2">
+                  <input type="checkbox" checked={form.quota_pagata} onChange={(e) => setForm({ ...form, quota_pagata: e.target.checked })} />
+                  <label className="text-sm text-gray-700">Quota associativa già versata</label>
+                </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo rapporto</label>
                   <select value={form.tipo_rapporto} onChange={(e) => setForm({ ...form, tipo_rapporto: e.target.value })}

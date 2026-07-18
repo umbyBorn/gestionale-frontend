@@ -52,15 +52,15 @@ const App: React.FC = () => {
           <Route path="/tesserati" element={<RouteGuard titolo="Tesserati" sezione="tesserati"><Tesserati /></RouteGuard>} />
           <Route path="/gruppi" element={<RouteGuard titolo="Gruppi" sezione="gruppi"><Gruppi /></RouteGuard>} />
           <Route path="/pagamenti" element={<RouteGuard titolo="Pagamenti" sezione="pagamenti"><Pagamenti /></RouteGuard>} />
-          <Route path="/staff" element={<RouteGuard titolo="Staff" sezione="staff"><Staff /></RouteGuard>} />
+          <Route path="/staff" element={<RouteGuard titolo="Soci" sezione="staff"><Staff /></RouteGuard>} />
           <Route path="/presenze" element={<RouteGuard titolo="Presenze" sezione="presenze"><Presenze /></RouteGuard>} />
           <Route path="/assemblee" element={<RouteGuard titolo="Assemblee" sezione="assemblee"><Assemblee /></RouteGuard>} />
           <Route path="/calendario" element={<RouteGuard titolo="Calendario" sezione="calendario"><Calendario /></RouteGuard>} />
           <Route path="/messaggi" element={<RouteGuard titolo="Messaggi" sezione="messaggi"><Messaggi /></RouteGuard>} />
           <Route path="/prima-nota" element={<RouteGuard titolo="Prima nota" sezione="pagamenti"><PrimaNota /></RouteGuard>} />
           <Route path="/rendiconto" element={<RouteGuard titolo="Rendiconto" sezione="pagamenti"><Rendiconto /></RouteGuard>} />
-          {process.env.REACT_APP_LOCALE === 'true' && (
-            <Route path="/sincronizza" element={<RouteGuard titolo="Sincronizza"><Sincronizza /></RouteGuard>} />
+          {(process.env.REACT_APP_LOCALE === 'true' || window.location.hostname === '127.0.0.1') && (
+            <Route path="/sincronizza" element={<Sincronizza />} />
           )}
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
           <Route path="/documenti-societari" element={<RouteGuard titolo="Documenti societari"><DocumentiSocietari /></RouteGuard>} />
