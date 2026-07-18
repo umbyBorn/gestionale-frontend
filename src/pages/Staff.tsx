@@ -105,7 +105,9 @@ const Staff: React.FC = () => {
     setEditingId(m.id);
     setForm({
       nome: m.nome, cognome: m.cognome, data_nascita: m.data_nascita, codice_fiscale: m.codice_fiscale,
+      indirizzo: m.indirizzo || '', comune_residenza: m.comune_residenza || '',
       telefono: m.telefono || '', email: m.email || '', ruolo: m.ruolo, tipo_rapporto: m.tipo_rapporto, data_inizio: m.data_inizio,
+      quota_associativa: m.quota_associativa ?? 5, quota_pagata: m.quota_pagata ?? false,
     });
     setMostraForm(true);
   };
