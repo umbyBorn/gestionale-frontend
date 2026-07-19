@@ -5,7 +5,8 @@ import {
   getGruppiStaff, aggiornaGruppiStaff, getGruppi,
   getCompensiStaff, creaCompenso, eliminaCompenso,
   getContrattiStaff, creaContratto, eliminaContratto,
-  getTesserati, caricaModuloSocio, scaricaModuloAdesionePdf, scaricaTesseraPdf, getTabulatoTessere, getProssimoNumeroTesseraLibero,
+  getTesserati, scaricaModuloAdesionePdf, scaricaTesseraPdf, getTabulatoTessere, getProssimoNumeroTesseraLibero,
+  getDocumentiSocio, caricaDocumentoSocio, eliminaDocumentoSocio,
 } from '../services/api';
 
 interface Membro {
@@ -44,6 +45,8 @@ const Staff: React.FC = () => {
   const [form, setForm] = useState(formVuoto);
   const [tesserati, setTesserati] = useState<TesseratoBase[]>([]);
   const [tesseratoOrigineId, setTesseratoOrigineId] = useState<string>('');
+  const [documentiSocio, setDocumentiSocio] = useState<any[]>([]);
+  const [tipoDocUpload, setTipoDocUpload] = useState('Modulo di adesione firmato');
 
   // Dettaglio membro selezionato
   const [selezionato, setSelezionato] = useState<Membro | null>(null);
@@ -70,10 +73,11 @@ const Staff: React.FC = () => {
   const apriDettaglio = async (m: Membro) => {
     setSelezionato(m);
     setSubTab('compensi');
-    const [c, ct, gr] = await Promise.all([getCompensiStaff(m.id), getContrattiStaff(m.id), getGruppiStaff(m.id)]);
+    const [c, ct, gr, doc] = await Promise.all([getCompensiStaff(m.id), getContrattiStaff(m.id), getGruppiStaff(m.id), getDocumentiSocio(m.id)]);
     setCompensi(c.data);
     setContratti(ct.data);
     setGruppiAssegnati(gr.data.map((g: Gruppo) => g.id));
+    setDocumentiSocio(doc.data);
   };
 
   const ricaricaDettaglio = async () => {
@@ -258,7 +262,7 @@ const Staff: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => apriModifica(selezionato)} className="text-blue-100 hover:text-white text-xs font-medium">Modifica</button>
-                    <button onClick={() => handleElimina(selezionato.id)} className="text-red-200 hover:text-white text-xs font-medium">Disattiva</button>
+                    <button onClick={() => handleElimina(selezionato.id)} className="text-red-200 hover:text-white text-xs font-medium">🗑 Elimina definitivamente</button>
                     <button onClick={() => setSelezionato(null)} className="text-blue-200 hover:text-white text-xl leading-none">✕</button>
                   </div>
                 </div>
@@ -279,35 +283,62 @@ const Staff: React.FC = () => {
                   ))}
                 </div>
 
-                {/* TESSERA E MODULO ADESIONE */}
-                <div className="px-5 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Tessera N. {selezionato.numero_tessera ?? '—'}
-                    {selezionato.quota_pagata ? ' · quota pagata' : ' · quota da versare'}
-                  </span>
-                  <button onClick={() => scaricaTesseraPdf(selezionato.id, `tessera_${selezionato.cognome}.pdf`)}
-                    className="text-blue-600 hover:text-blue-800 text-xs font-medium">🪪 Scarica tessera</button>
-                  <button onClick={() => scaricaModuloAdesionePdf(selezionato.id, false, `modulo_adesione_${selezionato.cognome}.pdf`)}
-                    className="text-blue-600 hover:text-blue-800 text-xs font-medium">📄 Modulo maggiorenni</button>
-                  <button onClick={() => scaricaModuloAdesionePdf(selezionato.id, true, `modulo_adesione_minorenni_${selezionato.cognome}.pdf`)}
-                    className="text-blue-600 hover:text-blue-800 text-xs font-medium">📄 Modulo minorenni</button>
-                  {selezionato.path_modulo_firmato ? (
-                    <a href={selezionato.path_modulo_firmato} target="_blank" rel="noreferrer" className="text-green-600 hover:text-green-800 text-xs font-medium">
-                      ✅ Modulo firmato caricato
-                    </a>
-                  ) : (
-                    <label className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">
-                      + Carica modulo firmato
-                      <input type="file" accept="application/pdf" className="hidden"
+                {/* TESSERA E MODULI/DOCUMENTI */}
+                <div className="px-5 py-3 border-b bg-gray-50">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Tessera N. {selezionato.numero_tessera ?? '—'}
+                      {selezionato.quota_pagata ? ' · quota pagata' : ' · quota da versare'}
+                    </span>
+                    <button onClick={() => scaricaTesseraPdf(selezionato.id, `tessera_${selezionato.cognome}.pdf`)}
+                      className="text-blue-600 hover:text-blue-800 text-xs font-medium">🪪 Scarica tessera</button>
+                    <button onClick={() => scaricaModuloAdesionePdf(selezionato.id, false, `modulo_adesione_${selezionato.cognome}.pdf`)}
+                      className="text-blue-600 hover:text-blue-800 text-xs font-medium">📄 Modulo maggiorenni (da firmare)</button>
+                    <button onClick={() => scaricaModuloAdesionePdf(selezionato.id, true, `modulo_adesione_minorenni_${selezionato.cognome}.pdf`)}
+                      className="text-blue-600 hover:text-blue-800 text-xs font-medium">📄 Modulo minorenni (da firmare)</button>
+                  </div>
+
+                  <div className="space-y-1 mb-2">
+                    {documentiSocio.length === 0 ? (
+                      <p className="text-xs text-gray-400">Nessun documento caricato per questo socio.</p>
+                    ) : documentiSocio.map(d => (
+                      <div key={d.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-1.5 text-xs">
+                        <a href={d.url} target="_blank" rel="noreferrer" download={d.nome_file} className="text-green-700 hover:text-green-900 font-medium">
+                          ✅ {d.tipo} — {d.nome_file}
+                        </a>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm('Eliminare questo documento?')) {
+                              await eliminaDocumentoSocio(d.id);
+                              const res = await getDocumentiSocio(selezionato.id);
+                              setDocumentiSocio(res.data);
+                            }
+                          }}
+                          className="text-red-400 hover:text-red-600"
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <select value={tipoDocUpload} onChange={e => setTipoDocUpload(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+                      <option>Modulo di adesione firmato</option>
+                      <option>Documento di identità</option>
+                      <option>Altro</option>
+                    </select>
+                    <label className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer bg-indigo-50 px-3 py-1.5 rounded-lg">
+                      + Carica documento
+                      <input type="file" accept="application/pdf,image/*" className="hidden"
                         onChange={async (e) => {
                           if (e.target.files?.[0]) {
-                            const res = await caricaModuloSocio(selezionato.id, e.target.files[0]);
-                            setSelezionato(res.data);
-                            carica();
+                            await caricaDocumentoSocio(selezionato.id, tipoDocUpload, e.target.files[0]);
+                            const res = await getDocumentiSocio(selezionato.id);
+                            setDocumentiSocio(res.data);
                           }
                         }} />
                     </label>
-                  )}
+                  </div>
                 </div>
 
                 <div className="p-5">

@@ -13,7 +13,6 @@ import Assemblee from './pages/Assemblee';
 import Calendario from './pages/Calendario';
 import Messaggi from './pages/Messaggi';
 import Admin from './pages/Admin';
-import DocumentiSocietari from './pages/DocumentiSocietari';
 import PortaleTesserato from './pages/PortaleTesserato';
 import FormIscrizione from './pages/FormIscrizione';
 import Iscrizioni from './pages/Iscrizioni';
@@ -52,7 +51,7 @@ const App: React.FC = () => {
           <Route path="/tesserati" element={<RouteGuard titolo="Tesserati" sezione="tesserati"><Tesserati /></RouteGuard>} />
           <Route path="/gruppi" element={<RouteGuard titolo="Gruppi" sezione="gruppi"><Gruppi /></RouteGuard>} />
           <Route path="/pagamenti" element={<RouteGuard titolo="Pagamenti" sezione="pagamenti"><Pagamenti /></RouteGuard>} />
-          <Route path="/staff" element={<RouteGuard titolo="Soci" sezione="staff"><Staff /></RouteGuard>} />
+          <Route path="/staff" element={<RouteGuard titolo="Staff" sezione="staff"><Staff /></RouteGuard>} />
           <Route path="/presenze" element={<RouteGuard titolo="Presenze" sezione="presenze"><Presenze /></RouteGuard>} />
           <Route path="/assemblee" element={<RouteGuard titolo="Assemblee" sezione="assemblee"><Assemblee /></RouteGuard>} />
           <Route path="/calendario" element={<RouteGuard titolo="Calendario" sezione="calendario"><Calendario /></RouteGuard>} />
@@ -63,7 +62,6 @@ const App: React.FC = () => {
             <Route path="/sincronizza" element={<Sincronizza />} />
           )}
           <Route path="/admin" element={<RouteGuard titolo="Utenti e permessi" soloAdmin><Admin /></RouteGuard>} />
-          <Route path="/documenti-societari" element={<RouteGuard titolo="Documenti societari"><DocumentiSocietari /></RouteGuard>} />
           <Route path="/iscrizioni" element={<RouteGuard titolo="Iscrizioni online"><Iscrizioni /></RouteGuard>} />
           <Route path="/iscriviti/:token" element={<FormIscrizione />} />
           <Route path="/import" element={<RouteGuard titolo="Importazione" sezione="tesserati"><Importazione /></RouteGuard>} />

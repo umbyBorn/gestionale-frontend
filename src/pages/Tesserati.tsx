@@ -35,7 +35,7 @@ const formVuoto = {
   categoria: '', qualifica: '', sport: '', data_emissione_tessera: '',
   data_scadenza_tessera: '', matricola: '', data_scadenza_certificato_medico: '',
   disabile: false, straniero: false,
-  titolo_studio: '', e_socio: false, genitore_id: null as number | null,
+  titolo_studio: '', e_socio: true, genitore_id: null as number | null,
 };
 
 const formGenitoreVuoto = { nome: '', cognome: '', email: '', telefono: '', documento_tipo: '', documento_numero: '' };
@@ -726,8 +726,6 @@ Sei sicuro?`)) {
                           <option>Documento di identità</option>
                           <option>Modulo iscrizione</option>
                           <option>Consenso trattamento dati</option>
-                          <option>Liberatoria foto/video</option>
-                          <option>Regolamento sociale firmato</option>
                           <option>Altro</option>
                         </select>
                       </div>

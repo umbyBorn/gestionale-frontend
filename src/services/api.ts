@@ -109,6 +109,13 @@ export const scaricaTesseraPdf = async (id: number, nomeFile: string) => {
 };
 export const getTabulatoTessere = () => api.get('/staff/tabulato/tessere');
 export const getProssimoNumeroTesseraLibero = () => api.get('/staff/tessera/prossimo-numero-libero');
+export const getDocumentiSocio = (staffId: number) => api.get(`/staff/${staffId}/documenti`);
+export const caricaDocumentoSocio = (staffId: number, tipo: string, file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post(`/staff/${staffId}/documenti?tipo=${encodeURIComponent(tipo)}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+};
+export const eliminaDocumentoSocio = (documentoId: number) => api.delete(`/staff/documenti/${documentoId}`);
 export const aggiornaStaff = (id: number, data: any) => api.put(`/staff/${id}`, data);
 export const eliminaStaff = (id: number) => api.delete(`/staff/${id}`);
 export const getGruppiStaff = (id: number) => api.get(`/staff/${id}/gruppi`);
