@@ -149,10 +149,14 @@ const Staff: React.FC = () => {
   };
 
   const handleElimina = async (id: number) => {
-    if (window.confirm('Eliminare DEFINITIVAMENTE questo socio? L\'operazione non è reversibile (verranno cancellati anche compensi, contratti e assegnazioni ai gruppi collegati).')) {
-      await eliminaStaff(id);
-      if (selezionato?.id === id) setSelezionato(null);
-      carica();
+    if (window.confirm('Eliminare DEFINITIVAMENTE questo socio? L\'operazione non è reversibile (verranno cancellati anche compensi, contratti, documenti e assegnazioni ai gruppi collegati).')) {
+      try {
+        await eliminaStaff(id);
+        if (selezionato?.id === id) setSelezionato(null);
+        carica();
+      } catch (err: any) {
+        alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione del socio.');
+      }
     }
   };
 
