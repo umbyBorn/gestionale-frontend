@@ -5,7 +5,7 @@ import {
   getGruppiStaff, aggiornaGruppiStaff, getGruppi,
   getCompensiStaff, creaCompenso, eliminaCompenso,
   getContrattiStaff, creaContratto, eliminaContratto,
-  getTesserati, caricaModuloSocio, scaricaModuloAdesionePdf, scaricaTesseraPdf, getTabulatoTessere,
+  getTesserati, caricaModuloSocio, scaricaModuloAdesionePdf, scaricaTesseraPdf, getTabulatoTessere, getProssimoNumeroTesseraLibero,
 } from '../services/api';
 
 interface Membro {
@@ -32,6 +32,7 @@ const formVuoto = {
   nome: '', cognome: '', data_nascita: '', codice_fiscale: '', indirizzo: '', comune_residenza: '', telefono: '', email: '',
   ruolo: '', tipo_rapporto: 'volontario', data_inizio: '',
   quota_associativa: 5, quota_pagata: false,
+  numero_tessera: undefined as number | undefined,
 };
 
 const Staff: React.FC = () => {
@@ -82,7 +83,17 @@ const Staff: React.FC = () => {
     setContratti(ct.data);
   };
 
-  const apriNuovo = () => { setEditingId(null); setForm(formVuoto); setTesseratoOrigineId(''); setMostraForm(true); };
+  const apriNuovo = async () => {
+    setEditingId(null);
+    setTesseratoOrigineId('');
+    let numeroSuggerito: number | undefined = undefined;
+    try {
+      const res = await getProssimoNumeroTesseraLibero();
+      numeroSuggerito = res.data.numero_suggerito;
+    } catch { /* se fallisce, si lascia vuoto e lo assegna il backend alla creazione */ }
+    setForm({ ...formVuoto, numero_tessera: numeroSuggerito });
+    setMostraForm(true);
+  };
 
   const handleStampaTabulato = async () => {
     const res = await getTabulatoTessere();
@@ -108,6 +119,7 @@ const Staff: React.FC = () => {
       indirizzo: m.indirizzo || '', comune_residenza: m.comune_residenza || '',
       telefono: m.telefono || '', email: m.email || '', ruolo: m.ruolo, tipo_rapporto: m.tipo_rapporto, data_inizio: m.data_inizio,
       quota_associativa: m.quota_associativa ?? 5, quota_pagata: m.quota_pagata ?? false,
+      numero_tessera: m.numero_tessera,
     });
     setMostraForm(true);
   };
@@ -133,7 +145,7 @@ const Staff: React.FC = () => {
   };
 
   const handleElimina = async (id: number) => {
-    if (window.confirm('Disattivare questo membro dello staff?')) {
+    if (window.confirm('Eliminare DEFINITIVAMENTE questo socio? L\'operazione non è reversibile (verranno cancellati anche compensi, contratti e assegnazioni ai gruppi collegati).')) {
       await eliminaStaff(id);
       if (selezionato?.id === id) setSelezionato(null);
       carica();
@@ -450,6 +462,29 @@ const Staff: React.FC = () => {
                     />
                   </div>
                 ))}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Numero tessera</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={form.numero_tessera ?? ''}
+                      onChange={(e) => setForm({ ...form, numero_tessera: e.target.value ? parseInt(e.target.value) : undefined })}
+                      placeholder="lascia vuoto per assegnazione automatica"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await getProssimoNumeroTesseraLibero();
+                        setForm(f => ({ ...f, numero_tessera: res.data.numero_suggerito }));
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap px-2"
+                    >
+                      Primo libero
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Deve essere univoco. Se ne assegni uno già usato da un altro socio, il salvataggio verrà bloccato con un avviso.</p>
+                </div>
                 <div className="col-span-2 flex items-center gap-2">
                   <input type="checkbox" checked={form.quota_pagata} onChange={(e) => setForm({ ...form, quota_pagata: e.target.checked })} />
                   <label className="text-sm text-gray-700">Quota associativa già versata</label>

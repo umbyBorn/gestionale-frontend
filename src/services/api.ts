@@ -108,6 +108,7 @@ export const scaricaTesseraPdf = async (id: number, nomeFile: string) => {
   URL.revokeObjectURL(url);
 };
 export const getTabulatoTessere = () => api.get('/staff/tabulato/tessere');
+export const getProssimoNumeroTesseraLibero = () => api.get('/staff/tessera/prossimo-numero-libero');
 export const aggiornaStaff = (id: number, data: any) => api.put(`/staff/${id}`, data);
 export const eliminaStaff = (id: number) => api.delete(`/staff/${id}`);
 export const getGruppiStaff = (id: number) => api.get(`/staff/${id}/gruppi`);
