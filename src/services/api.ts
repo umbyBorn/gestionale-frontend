@@ -82,10 +82,11 @@ export const getRendiconto = (data_da?: string, data_a?: string) =>
   api.get('/rendiconto/', { params: { data_da, data_a } });
 
 // ---- TARIFFE ----
-export const getTariffe = () => api.get('/tariffe/');
+export const getTariffe = (includiNascoste: boolean = false) => api.get(`/tariffe/?includi_nascoste=${includiNascoste}`);
 export const creaTariffa = (data: any) => api.post('/tariffe/', data);
 export const modificaTariffa = (id: number, data: any) => api.put(`/tariffe/${id}`, data);
 export const eliminaTariffa = (id: number) => api.delete(`/tariffe/${id}`);
+export const riattivaTariffa = (id: number) => api.put(`/tariffe/${id}/riattiva`);
 
 // ---- STAFF ----
 export const getStaff = () => api.get('/staff/');

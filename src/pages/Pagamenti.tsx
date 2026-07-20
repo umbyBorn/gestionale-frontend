@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { formatDate } from '../utils/date';
 import {
   getPagamenti, creaPagamento, aggiornaPagamento, eliminaPagamento,
-  getTariffe, creaTariffa, modificaTariffa, eliminaTariffa, getTesserati, registraIncasso,
+  getTariffe, creaTariffa, modificaTariffa, eliminaTariffa, riattivaTariffa, getTesserati, registraIncasso,
   generaPianoScadenze, creaPagamentoGruppo, getGruppi,
   modificaBatch, eliminaBatch,
   scaricaRicevutaPdf, inviaRicevutaEmail,
@@ -20,15 +20,16 @@ interface Pagamento {
   pagato: boolean;
   descrizione?: string;
   gruppo_generazione_id?: string;
+  emetti_ricevuta?: boolean;
 }
-interface Tariffa { id: number; nome: string; importo: number; categoria?: string; }
+interface Tariffa { id: number; nome: string; importo: number; categoria?: string; attiva?: boolean; }
 interface Tesserato { id: number; nome: string; cognome: string; }
 interface Gruppo { id: number; nome: string; }
 
 const TAB = [
   { id: 'scadenzario', label: '📋 Scadenzario' },
-  { id: 'piano', label: '🗓️ Genera piano quote' },
-  { id: 'ad-hoc', label: '🎽 Pagamento di gruppo' },
+  { id: 'piano', label: '🗓️ Genera pagamenti di gruppi mensili' },
+  { id: 'ad-hoc', label: '🎽 Genera pagamenti di gruppi (una tantum)' },
   { id: 'tariffe', label: '🏷️ Tariffe' },
   { id: 'donazioni', label: '❤️ Erogazioni liberali' },
 ] as const;
@@ -43,6 +44,12 @@ const Pagamenti: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<'tutti' | 'pagati' | 'scaduti'>('tutti');
   const [ricerca, setRicerca] = useState('');
+  const [filtroMese, setFiltroMese] = useState<string>('');
+  const [filtroAnno, setFiltroAnno] = useState<string>('');
+  const [filtroTesseratoId, setFiltroTesseratoId] = useState<string>('');
+  const [filtroTariffaNome, setFiltroTariffaNome] = useState<string>('');
+  const [batchAperti, setBatchAperti] = useState(false);
+  const [mostraTariffeNascoste, setMostraTariffeNascoste] = useState(false);
 
   const [mostraFormPagamento, setMostraFormPagamento] = useState(false);
   const [mostraFormTariffa, setMostraFormTariffa] = useState(false);
@@ -58,7 +65,7 @@ const Pagamenti: React.FC = () => {
   const [formTariffa, setFormTariffa] = useState({ nome: '', importo: 0, categoria: '' });
 
   const carica = () => {
-    Promise.all([getPagamenti(), getTariffe(), getTesserati(), getGruppi()]).then(([p, t, ts, g]) => {
+    Promise.all([getPagamenti(), getTariffe(mostraTariffeNascoste), getTesserati(), getGruppi()]).then(([p, t, ts, g]) => {
       setPagamenti(p.data);
       setTariffe(t.data);
       setTesserati(ts.data);
@@ -67,33 +74,58 @@ const Pagamenti: React.FC = () => {
     });
   };
 
+  const handleRiattivaTariffa = async (id: number) => {
+    await riattivaTariffa(id);
+    carica();
+  };
+
   useEffect(() => { carica(); }, []);
 
   const flash = (msg: string) => { setMessaggio(msg); setTimeout(() => setMessaggio(''), 4000); };
 
   const handleCreaPagamento = async () => {
-    await creaPagamento(formPagamento);
-    setMostraFormPagamento(false);
-    setFormPagamento({ tesserato_id: 0, tariffa_id: 0, importo: 0, data_scadenza: '', pagato: false, descrizione: '' });
-    carica();
+    if (!formPagamento.tesserato_id || !formPagamento.tariffa_id || !formPagamento.importo || !formPagamento.data_scadenza) {
+      alert('Compila tutti i campi: tesserato, tariffa, importo e data di scadenza sono obbligatori.');
+      return;
+    }
+    try {
+      await creaPagamento(formPagamento);
+      setMostraFormPagamento(false);
+      setFormPagamento({ tesserato_id: 0, tariffa_id: 0, importo: 0, data_scadenza: '', pagato: false, descrizione: '' });
+      carica();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore nella creazione del pagamento.');
+    }
   };
 
   const handleSalvaModifica = async () => {
     if (!pagamentoInModifica) return;
-    await aggiornaPagamento(pagamentoInModifica.id, {
-      importo: pagamentoInModifica.importo,
-      data_scadenza: pagamentoInModifica.data_scadenza,
-      tariffa_id: pagamentoInModifica.tariffa_id,
-      descrizione: pagamentoInModifica.descrizione,
-    });
-    setPagamentoInModifica(null);
-    carica();
+    if (!pagamentoInModifica.importo || !pagamentoInModifica.data_scadenza) {
+      alert('Importo e data di scadenza sono obbligatori.');
+      return;
+    }
+    try {
+      await aggiornaPagamento(pagamentoInModifica.id, {
+        importo: pagamentoInModifica.importo,
+        data_scadenza: pagamentoInModifica.data_scadenza,
+        tariffa_id: pagamentoInModifica.tariffa_id,
+        descrizione: pagamentoInModifica.descrizione,
+      });
+      setPagamentoInModifica(null);
+      carica();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore nel salvataggio della modifica.');
+    }
   };
 
   const handleElimina = async (id: number) => {
     if (window.confirm('Eliminare questo pagamento?')) {
-      await eliminaPagamento(id);
-      carica();
+      try {
+        await eliminaPagamento(id);
+        carica();
+      } catch (err: any) {
+        alert(err?.response?.data?.detail || 'Errore durante l\'eliminazione del pagamento.');
+      }
     }
   };
 
@@ -125,7 +157,11 @@ const Pagamenti: React.FC = () => {
   const handleIncasso = async (id: number) => {
     const metodo = window.prompt('Metodo di pagamento (contanti / bonifico / altro):', 'contanti');
     if (metodo && ['contanti', 'bonifico', 'altro'].includes(metodo)) {
-      await registraIncasso(id, metodo);
+      let emettiRicevuta = true;
+      if (metodo === 'contanti') {
+        emettiRicevuta = !window.confirm('Pagamento in contanti: NON emettere la ricevuta per questo incasso?\n\n(Premi OK per NON emettere la ricevuta, Annulla per emetterla normalmente)');
+      }
+      await registraIncasso(id, metodo, emettiRicevuta);
       carica();
     }
   };
@@ -161,6 +197,10 @@ const Pagamenti: React.FC = () => {
   const filtrati = pagamenti.filter((p) => {
     if (filtro === 'pagati' && !p.pagato) return false;
     if (filtro === 'scaduti' && (p.pagato || p.data_scadenza >= oggi)) return false;
+    if (filtroMese && p.data_scadenza && String(new Date(p.data_scadenza).getMonth() + 1) !== filtroMese) return false;
+    if (filtroAnno && p.data_scadenza && String(new Date(p.data_scadenza).getFullYear()) !== filtroAnno) return false;
+    if (filtroTesseratoId && String(p.tesserato_id) !== filtroTesseratoId) return false;
+    if (filtroTariffaNome && nomeTariffa(p.tariffa_id) !== filtroTariffaNome) return false;
     if (ricerca) {
       const q = ricerca.toLowerCase();
       const testoTesserato = nomeTesserato(p.tesserato_id).toLowerCase();
@@ -168,7 +208,14 @@ const Pagamenti: React.FC = () => {
       if (!testoTesserato.includes(q) && !testoVoce.includes(q)) return false;
     }
     return true;
-  });
+  }).sort((a, b) => (a.data_scadenza || '').localeCompare(b.data_scadenza || ''));
+
+  // Anni effettivamente presenti tra le scadenze, per popolare il combo "Anno"
+  const anniDisponibili = Array.from(new Set(
+    pagamenti.filter(p => p.data_scadenza).map(p => new Date(p.data_scadenza).getFullYear())
+  )).sort((a, b) => b - a);
+
+  const MESI_LABEL = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
   const totalePagato = pagamenti.filter(p => p.pagato).reduce((a, p) => a + Number(p.importo), 0);
   const totaleDaIncassare = pagamenti.filter(p => !p.pagato).reduce((a, p) => a + Number(p.importo), 0);
   const totaleScaduto = pagamenti.filter(p => !p.pagato && p.data_scadenza < oggi).reduce((a, p) => a + Number(p.importo), 0);
@@ -256,18 +303,26 @@ const Pagamenti: React.FC = () => {
         </div>
 
         {/* TAB NAV */}
-        <div className="flex gap-1 mb-5 overflow-x-auto bg-white rounded-xl p-1 shadow-sm w-fit">
-          {TAB.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                tab === t.id ? 'bg-blue-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <div className="flex gap-1 overflow-x-auto bg-white rounded-xl p-1 shadow-sm w-fit">
+            {TAB.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
+                  tab === t.id ? 'bg-blue-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setMostraFormPagamento(true)}
+            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
+          >
+            Genera pagamento SINGOLO
+          </button>
         </div>
 
         {messaggio && (
@@ -285,30 +340,37 @@ const Pagamenti: React.FC = () => {
               <div>
                 {batches.length > 0 && (
                   <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 Gruppi generati in blocco</h3>
-                    <p className="text-xs text-gray-500 mb-3">
-                      Pagamenti creati insieme (piano scadenze o pagamento di gruppo). Puoi modificarli o eliminarli tutti insieme se creati per errore.
-                    </p>
-                    <div className="space-y-2">
-                      {batches.map(b => (
-                        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                          <div className="text-sm">
-                            <span className="font-medium text-gray-800">{b.nome}</span>
-                            <span className="text-gray-500 ml-2 text-xs">
-                              {b.count} pagamenti · {b.countNonPagati} da incassare · totale € {b.totale.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex gap-3">
-                            <button onClick={() => apriModificaBatch(b)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                              ✏️ Modifica non pagati
-                            </button>
-                            <button onClick={() => handleEliminaBatch(b)} className="text-red-500 hover:text-red-700 text-xs font-medium">
-                              🗑 Elimina non pagati
-                            </button>
-                          </div>
+                    <button onClick={() => setBatchAperti(v => !v)} className="w-full flex items-center justify-between text-left">
+                      <h3 className="text-sm font-semibold text-gray-700">📦 Gruppi generati in blocco ({batches.length})</h3>
+                      <span className="text-gray-400 text-xs">{batchAperti ? '▲ nascondi' : '▼ mostra'}</span>
+                    </button>
+                    {batchAperti && (
+                      <>
+                        <p className="text-xs text-gray-500 mt-3 mb-3">
+                          Pagamenti creati insieme (piano scadenze o pagamento di gruppo). Puoi modificarli o eliminarli tutti insieme se creati per errore.
+                        </p>
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                          {batches.map(b => (
+                            <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                              <div className="text-sm">
+                                <span className="font-medium text-gray-800">{b.nome}</span>
+                                <span className="text-gray-500 ml-2 text-xs">
+                                  {b.count} pagamenti · {b.countNonPagati} da incassare · totale € {b.totale.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex gap-3">
+                                <button onClick={() => apriModificaBatch(b)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                                  ✏️ Modifica non pagati
+                                </button>
+                                <button onClick={() => handleEliminaBatch(b)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                                  🗑 Elimina non pagati
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -331,22 +393,42 @@ const Pagamenti: React.FC = () => {
                     onChange={e => setRicerca(e.target.value)}
                     className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 max-w-xs"
                   />
-                  <button
-                    onClick={() => setMostraFormPagamento(true)}
-                    className="ml-auto bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
-                  >
-                    + Pagamento singolo
-                  </button>
+                  <select value={filtroMese} onChange={e => setFiltroMese(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="">Tutti i mesi</option>
+                    {MESI_LABEL.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
+                  </select>
+                  <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="">Tutti gli anni</option>
+                    {anniDisponibili.map(a => <option key={a} value={String(a)}>{a}</option>)}
+                  </select>
+                  <select value={filtroTesseratoId} onChange={e => setFiltroTesseratoId(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm max-w-[180px]">
+                    <option value="">Tutti i tesserati</option>
+                    {[...tesserati].sort((a, b) => a.cognome.localeCompare(b.cognome)).map(t => (
+                      <option key={t.id} value={String(t.id)}>{t.cognome} {t.nome}</option>
+                    ))}
+                  </select>
                 </div>
+
+                {filtroTariffaNome && (
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                      Tariffa: {filtroTariffaNome}
+                    </span>
+                    <button onClick={() => setFiltroTariffaNome('')} className="text-xs text-gray-400 hover:text-gray-600">✕ rimuovi filtro</button>
+                  </div>
+                )}
 
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                       <tr>
                         <th className="px-4 py-3 text-left text-gray-500 font-medium">Tesserato</th>
+                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Scadenza</th>
                         <th className="px-4 py-3 text-left text-gray-500 font-medium">Voce</th>
                         <th className="px-4 py-3 text-left text-gray-500 font-medium">Importo</th>
-                        <th className="px-4 py-3 text-left text-gray-500 font-medium">Scadenza</th>
                         <th className="px-4 py-3 text-left text-gray-500 font-medium">Stato</th>
                         <th className="px-4 py-3 text-left text-gray-500 font-medium">Azioni</th>
                       </tr>
@@ -355,9 +437,9 @@ const Pagamenti: React.FC = () => {
                       {filtrati.map((p, i) => (
                         <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
                           <td className="px-4 py-3 font-medium text-gray-700">{nomeTesserato(p.tesserato_id)}</td>
+                          <td className="px-4 py-3">{formatDate(p.data_scadenza)}</td>
                           <td className="px-4 py-3 text-gray-500">{p.descrizione || nomeTariffa(p.tariffa_id)}</td>
                           <td className="px-4 py-3 font-medium">€ {Number(p.importo).toFixed(2)}</td>
-                          <td className="px-4 py-3">{formatDate(p.data_scadenza)}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               p.pagato ? 'bg-green-100 text-green-700' :
@@ -374,7 +456,7 @@ const Pagamenti: React.FC = () => {
                                   Incassa
                                 </button>
                               )}
-                              {p.pagato && (
+                              {p.pagato && p.emetti_ricevuta !== false && (
                                 <>
                                   <button onClick={() => handleScaricaRicevuta(p.id)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">
                                     📄 Ricevuta
@@ -383,6 +465,9 @@ const Pagamenti: React.FC = () => {
                                     ✉️ Invia
                                   </button>
                                 </>
+                              )}
+                              {p.pagato && p.emetti_ricevuta === false && (
+                                <span className="text-gray-400 text-xs italic">senza ricevuta</span>
                               )}
                               <button onClick={() => setPagamentoInModifica(p)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
                                 Modifica
@@ -405,7 +490,7 @@ const Pagamenti: React.FC = () => {
 
             {/* ============ GENERA PIANO QUOTE ============ */}
             {tab === 'piano' && (
-              <GeneraPianoQuote gruppi={gruppi} tesserati={tesserati} onCreato={(msg) => { flash(msg); carica(); setTab('scadenzario'); }} />
+              <GeneraPianoQuote gruppi={gruppi} tesserati={tesserati} tariffe={tariffe} onCreato={(msg) => { flash(msg); carica(); setTab('scadenzario'); }} />
             )}
 
             {/* ============ PAGAMENTO AD HOC DI GRUPPO ============ */}
@@ -416,7 +501,19 @@ const Pagamenti: React.FC = () => {
             {/* ============ TARIFFE ============ */}
             {tab === 'tariffe' && (
               <div>
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={mostraTariffeNascoste}
+                      onChange={async (e) => {
+                        setMostraTariffeNascoste(e.target.checked);
+                        const res = await getTariffe(e.target.checked);
+                        setTariffe(res.data);
+                      }}
+                    />
+                    Mostra anche le tariffe nascoste
+                  </label>
                   <button
                     onClick={() => { setTariffaInModifica(null); setFormTariffa({ nome: '', importo: 0, categoria: '' }); setMostraFormTariffa(true); }}
                     className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
@@ -426,13 +523,24 @@ const Pagamenti: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {tariffe.map(t => (
-                    <div key={t.id} className="bg-white rounded-2xl shadow-sm p-4">
-                      <p className="font-bold text-gray-800">{t.nome}</p>
+                    <div key={t.id} className={`bg-white rounded-2xl shadow-sm p-4 ${t.attiva === false ? 'opacity-50' : ''}`}>
+                      <button
+                        onClick={() => { setFiltroTariffaNome(t.nome); setFiltro('tutti'); setTab('scadenzario'); }}
+                        className="font-bold text-blue-700 hover:text-blue-900 hover:underline text-left"
+                        title="Vedi lo scadenzario dei tesserati con questa tariffa"
+                      >
+                        {t.nome}
+                      </button>
+                      {t.attiva === false && <span className="ml-2 text-xs text-gray-400 italic">nascosta</span>}
                       <p className="text-2xl font-bold text-blue-700 mt-1">€ {Number(t.importo).toFixed(2)}</p>
                       {t.categoria && <p className="text-xs text-gray-400 mt-1">{t.categoria}</p>}
                       <div className="flex gap-3 mt-3 pt-3 border-t border-gray-100">
                         <button onClick={() => handleAvviaModificaTariffa(t)} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Modifica</button>
-                        <button onClick={() => handleEliminaTariffa(t.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Elimina</button>
+                        {t.attiva === false ? (
+                          <button onClick={() => handleRiattivaTariffa(t.id)} className="text-xs text-green-600 hover:text-green-800 font-medium">Riattiva</button>
+                        ) : (
+                          <button onClick={() => handleEliminaTariffa(t.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Nascondi</button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -593,13 +701,15 @@ const MESI = [
 ];
 
 const GeneraPianoQuote: React.FC<{
-  gruppi: Gruppo[]; tesserati: Tesserato[]; onCreato: (msg: string) => void;
-}> = ({ gruppi, tesserati, onCreato }) => {
+  gruppi: Gruppo[]; tesserati: Tesserato[]; tariffe: Tariffa[]; onCreato: (msg: string) => void;
+}> = ({ gruppi, tesserati, tariffe, onCreato }) => {
   const [destinatario, setDestinatario] = useState<'gruppo' | 'tutti'>('gruppo');
   const [gruppoId, setGruppoId] = useState(0);
   const [conIscrizione, setConIscrizione] = useState(true);
   const [importoIscrizione, setImportoIscrizione] = useState(50);
   const [dataIscrizione, setDataIscrizione] = useState('');
+  const [tariffaMensileId, setTariffaMensileId] = useState(0);
+  const [descrizioneMensile, setDescrizioneMensile] = useState('Pagamento mensile');
   const [importoMensile, setImportoMensile] = useState(40);
   const [meseInizio, setMeseInizio] = useState(8); // Settembre (0-indexed)
   const [meseFine, setMeseFine] = useState(5); // Giugno
@@ -608,10 +718,24 @@ const GeneraPianoQuote: React.FC<{
   const [voci, setVoci] = useState<VoceScadenza[] | null>(null);
   const [inviando, setInviando] = useState(false);
 
+  const selezionaTariffaMensile = (id: number) => {
+    setTariffaMensileId(id);
+    const t = tariffe.find(t => t.id === id);
+    if (t) {
+      setImportoMensile(t.importo);
+      setDescrizioneMensile(t.nome);
+    }
+  };
+
   const generaAnteprima = () => {
+    const nomeGruppo = destinatario === 'gruppo' ? gruppi.find(g => g.id === gruppoId)?.nome : undefined;
+    const suffissoGruppo = nomeGruppo ? ` - ${nomeGruppo.toUpperCase()}` : '';
+
     const risultato: VoceScadenza[] = [];
     if (conIscrizione && dataIscrizione) {
-      risultato.push({ nome: 'Iscrizione', importo: importoIscrizione, data_scadenza: dataIscrizione });
+      const dIscr = new Date(dataIscrizione + 'T12:00:00');
+      const nomeIscrizione = `${dIscr.getFullYear()} - ${MESI[dIscr.getMonth()].toUpperCase()} - ISCRIZIONE${suffissoGruppo}`;
+      risultato.push({ nome: nomeIscrizione, importo: importoIscrizione, data_scadenza: dataIscrizione });
     }
     // Genera le mensilità: da meseInizio (anno inizio) a meseFine (anno inizio+1 se meseFine < meseInizio)
     let mese = meseInizio;
@@ -619,7 +743,8 @@ const GeneraPianoQuote: React.FC<{
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const dataStr = `${anno}-${String(mese + 1).padStart(2, '0')}-${String(giornoScadenza).padStart(2, '0')}`;
-      risultato.push({ nome: MESI[mese], importo: importoMensile, data_scadenza: dataStr });
+      const nomeVoce = `${anno} - ${MESI[mese].toUpperCase()} - ${descrizioneMensile}${suffissoGruppo}`;
+      risultato.push({ nome: nomeVoce, importo: importoMensile, data_scadenza: dataStr });
       if (mese === meseFine) break;
       mese = (mese + 1) % 12;
       if (mese === 0) anno += 1;
@@ -713,6 +838,21 @@ const GeneraPianoQuote: React.FC<{
 
         <div className="border-t pt-4">
           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Quota mensile</label>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">Tariffa</label>
+            <select value={tariffaMensileId} onChange={e => selezionaTariffaMensile(parseInt(e.target.value))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value={0}>Nessuna (importo libero)</option>
+              {tariffe.map(t => <option key={t.id} value={t.id}>{t.nome} — €{t.importo}</option>)}
+            </select>
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">Descrizione</label>
+            <input type="text" value={descrizioneMensile} onChange={e => setDescrizioneMensile(e.target.value)}
+              placeholder="Es. Pagamento mensile pallavolo"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            <p className="text-xs text-gray-400 mt-1">Il sistema genera automaticamente il nome nel formato "ANNO - MESE - {descrizioneMensile || 'Motivo'}{destinatario === 'gruppo' && gruppi.find(g => g.id === gruppoId) ? ` - ${gruppi.find(g => g.id === gruppoId)!.nome.toUpperCase()}` : ''}" (es. "2026 - OTTOBRE - {descrizioneMensile || 'Pagamento mensile'}")</p>
+          </div>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Importo mensile (€)</label>
@@ -820,11 +960,14 @@ const PagamentoAdHocGruppo: React.FC<{
     if (destinatario === 'gruppo' && !gruppoId) { alert('Seleziona un gruppo'); return; }
     setInviando(true);
     try {
-      const payload: any = { nome, importo, data_scadenza: dataScadenza };
+      const d = new Date(dataScadenza + 'T12:00:00');
+      const nomeGruppo = destinatario === 'gruppo' ? gruppi.find(g => g.id === gruppoId)?.nome : undefined;
+      const nomeFinale = `${d.getFullYear()} - ${MESI[d.getMonth()].toUpperCase()} - ${nome}${nomeGruppo ? ` - ${nomeGruppo.toUpperCase()}` : ''}`;
+      const payload: any = { nome: nomeFinale, importo, data_scadenza: dataScadenza };
       if (destinatario === 'gruppo') payload.gruppo_id = gruppoId;
       else payload.tesserato_ids = tesserati.map(t => t.id);
       const res = await creaPagamentoGruppo(payload);
-      onCreato(`Creato pagamento "${nome}" per ${res.data.tesserati_coinvolti} tesserati.`);
+      onCreato(`Creato pagamento "${nomeFinale}" per ${res.data.tesserati_coinvolti} tesserati.`);
       setNome(''); setImporto(0); setDataScadenza('');
     } catch (e: any) {
       alert(e?.response?.data?.detail || 'Errore nella creazione del pagamento di gruppo');
