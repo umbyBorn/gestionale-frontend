@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { formatDate } from '../utils/date';
 import {
   getPagamenti, creaPagamento, aggiornaPagamento, eliminaPagamento,
-  getTariffe, creaTariffa, modificaTariffa, eliminaTariffa, riattivaTariffa, getTesserati, registraIncasso,
+  getTariffe, creaTariffa, modificaTariffa, eliminaTariffa, eliminaTariffaDefinitivo, riattivaTariffa, getTesserati, registraIncasso,
   generaPianoScadenze, creaPagamentoGruppo, getGruppi,
   modificaBatch, eliminaBatch,
   scaricaRicevutaPdf, inviaRicevutaEmail,
-  getRicevuteDonazione, creaRicevutaDonazione, scaricaRicevutaDonazionePdf,
+  getRicevuteDonazione, creaRicevutaDonazione, modificaRicevutaDonazione, eliminaRicevutaDonazione, scaricaRicevutaDonazionePdf,
 } from '../services/api';
 
 interface Pagamento {
@@ -154,15 +154,28 @@ const Pagamenti: React.FC = () => {
     }
   };
 
-  const handleIncasso = async (id: number) => {
-    const metodo = window.prompt('Metodo di pagamento (contanti / bonifico / altro):', 'contanti');
-    if (metodo && ['contanti', 'bonifico', 'altro'].includes(metodo)) {
-      let emettiRicevuta = true;
-      if (metodo === 'contanti') {
-        emettiRicevuta = !window.confirm('Pagamento in contanti: NON emettere la ricevuta per questo incasso?\n\n(Premi OK per NON emettere la ricevuta, Annulla per emetterla normalmente)');
+  const handleEliminaTariffaDefinitivo = async (id: number) => {
+    if (window.confirm('Eliminare DEFINITIVAMENTE questa tariffa? I pagamenti già generati con questa tariffa NON verranno cancellati (manterranno la loro descrizione), ma il collegamento alla tariffa sarà rimosso in modo permanente.')) {
+      try {
+        await eliminaTariffaDefinitivo(id);
+        carica();
+      } catch (err: any) {
+        alert(err?.response?.data?.detail || 'Errore nell\'eliminazione della tariffa.');
       }
-      await registraIncasso(id, metodo, emettiRicevuta);
+    }
+  };
+
+  const [pagamentoDaIncassare, setPagamentoDaIncassare] = useState<Pagamento | null>(null);
+  const [metodoIncasso, setMetodoIncasso] = useState('contanti');
+
+  const confermaIncasso = async (emettiRicevuta: boolean) => {
+    if (!pagamentoDaIncassare) return;
+    try {
+      await registraIncasso(pagamentoDaIncassare.id, metodoIncasso, emettiRicevuta);
+      setPagamentoDaIncassare(null);
       carica();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Errore nella registrazione dell\'incasso.');
     }
   };
 
@@ -452,7 +465,7 @@ const Pagamenti: React.FC = () => {
                           <td className="px-4 py-3">
                             <div className="flex gap-3">
                               {!p.pagato && (
-                                <button onClick={() => handleIncasso(p.id)} className="text-green-600 hover:text-green-800 text-xs font-medium">
+                                <button onClick={() => { setPagamentoDaIncassare(p); setMetodoIncasso('contanti'); }} className="text-green-600 hover:text-green-800 text-xs font-medium">
                                   Incassa
                                 </button>
                               )}
@@ -534,13 +547,14 @@ const Pagamenti: React.FC = () => {
                       {t.attiva === false && <span className="ml-2 text-xs text-gray-400 italic">nascosta</span>}
                       <p className="text-2xl font-bold text-blue-700 mt-1">€ {Number(t.importo).toFixed(2)}</p>
                       {t.categoria && <p className="text-xs text-gray-400 mt-1">{t.categoria}</p>}
-                      <div className="flex gap-3 mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex gap-3 mt-3 pt-3 border-t border-gray-100 flex-wrap">
                         <button onClick={() => handleAvviaModificaTariffa(t)} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Modifica</button>
                         {t.attiva === false ? (
                           <button onClick={() => handleRiattivaTariffa(t.id)} className="text-xs text-green-600 hover:text-green-800 font-medium">Riattiva</button>
                         ) : (
-                          <button onClick={() => handleEliminaTariffa(t.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Nascondi</button>
+                          <button onClick={() => handleEliminaTariffa(t.id)} className="text-xs text-orange-500 hover:text-orange-700 font-medium">Nascondi</button>
                         )}
+                        <button onClick={() => handleEliminaTariffaDefinitivo(t.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Elimina definitivamente</button>
                       </div>
                     </div>
                   ))}
@@ -583,6 +597,53 @@ const Pagamenti: React.FC = () => {
         )}
 
         {/* FORM NUOVO PAGAMENTO SINGOLO */}
+        {pagamentoDaIncassare && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+              <h2 className="text-lg font-bold text-gray-800 mb-1">Registra incasso</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                {nomeTesserato(pagamentoDaIncassare.tesserato_id)} — € {Number(pagamentoDaIncassare.importo).toFixed(2)}
+              </p>
+
+              <label className="block text-sm font-medium text-gray-700 mb-1">Metodo di pagamento</label>
+              <select value={metodoIncasso} onChange={e => setMetodoIncasso(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4">
+                <option value="contanti">Contanti</option>
+                <option value="bonifico">Bonifico</option>
+                <option value="altro">Altro</option>
+              </select>
+
+              {metodoIncasso === 'contanti' ? (
+                <>
+                  <p className="text-sm text-gray-600 mb-3">Vuoi emettere la ricevuta per questo incasso in contanti?</p>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => confermaIncasso(true)}
+                      className="bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800">
+                      Con Ricevuta
+                    </button>
+                    <button onClick={() => confermaIncasso(false)}
+                      className="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200">
+                      Senza Ricevuta
+                    </button>
+                    <button onClick={() => setPagamentoDaIncassare(null)}
+                      className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+                      Annulla
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-end gap-2 mt-2">
+                  <button onClick={() => setPagamentoDaIncassare(null)} className="px-4 py-2 text-sm text-gray-600">Annulla</button>
+                  <button onClick={() => confermaIncasso(true)}
+                    className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800">
+                    Registra incasso
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {mostraFormPagamento && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
@@ -1048,6 +1109,7 @@ const RicevuteDonazione: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ nome_donatore: '', importo: 0, data: new Date().toISOString().split('T')[0], causale: '' });
   const [inviando, setInviando] = useState(false);
+  const [ricevutaInModifica, setRicevutaInModifica] = useState<number | null>(null);
 
   const carica = () => {
     getRicevuteDonazione().then(res => { setRicevute(res.data); setLoading(false); });
@@ -1058,22 +1120,45 @@ const RicevuteDonazione: React.FC = () => {
     if (!form.nome_donatore || !form.importo || !form.data) { alert('Compila nome, importo e data'); return; }
     setInviando(true);
     try {
-      const res = await creaRicevutaDonazione(form);
-      setForm({ nome_donatore: '', importo: 0, data: new Date().toISOString().split('T')[0], causale: '' });
-      carica();
-      // scarica subito il PDF appena generato
-      await scaricaRicevutaDonazionePdf(res.data.id);
+      if (ricevutaInModifica) {
+        await modificaRicevutaDonazione(ricevutaInModifica, form);
+        setRicevutaInModifica(null);
+        setForm({ nome_donatore: '', importo: 0, data: new Date().toISOString().split('T')[0], causale: '' });
+        carica();
+      } else {
+        const res = await creaRicevutaDonazione(form);
+        setForm({ nome_donatore: '', importo: 0, data: new Date().toISOString().split('T')[0], causale: '' });
+        carica();
+        // scarica subito il PDF appena generato
+        await scaricaRicevutaDonazionePdf(res.data.id);
+      }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Errore nella creazione della ricevuta');
+      alert(err?.response?.data?.detail || 'Errore nel salvataggio della ricevuta');
     } finally {
       setInviando(false);
+    }
+  };
+
+  const handleAvviaModifica = (r: RicevutaDonazione) => {
+    setRicevutaInModifica(r.id);
+    setForm({ nome_donatore: r.nome_donatore, importo: r.importo, data: r.data, causale: r.causale || '' });
+  };
+
+  const handleElimina = async (id: number) => {
+    if (window.confirm('Eliminare questa ricevuta di erogazione liberale?')) {
+      try {
+        await eliminaRicevutaDonazione(id);
+        carica();
+      } catch (err: any) {
+        alert(err?.response?.data?.detail || 'Errore nell\'eliminazione della ricevuta');
+      }
     }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="font-bold text-gray-800 mb-1">Nuova ricevuta per erogazione liberale</h2>
+        <h2 className="font-bold text-gray-800 mb-1">{ricevutaInModifica ? 'Modifica ricevuta' : 'Nuova ricevuta per erogazione liberale'}</h2>
         <p className="text-sm text-gray-500 mb-4">
           Per donazioni volontarie a sostegno dell'associazione (non collegate a una quota o a un tesserato specifico).
         </p>
@@ -1101,10 +1186,18 @@ const RicevuteDonazione: React.FC = () => {
               placeholder="Es. a sostegno del torneo di Capodanno" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
         </div>
-        <button onClick={handleCrea} disabled={inviando}
-          className="w-full mt-5 bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50">
-          {inviando ? 'Generazione...' : '❤️ Genera ricevuta e scarica PDF'}
-        </button>
+        <div className="flex gap-2 mt-5">
+          <button onClick={handleCrea} disabled={inviando}
+            className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50">
+            {inviando ? 'Salvataggio...' : ricevutaInModifica ? '💾 Salva modifiche' : '❤️ Genera ricevuta e scarica PDF'}
+          </button>
+          {ricevutaInModifica && (
+            <button onClick={() => { setRicevutaInModifica(null); setForm({ nome_donatore: '', importo: 0, data: new Date().toISOString().split('T')[0], causale: '' }); }}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">
+              Annulla
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm p-5">
@@ -1125,6 +1218,12 @@ const RicevuteDonazione: React.FC = () => {
                   <span className="font-bold text-green-700">€ {Number(r.importo).toFixed(2)}</span>
                   <button onClick={() => scaricaRicevutaDonazionePdf(r.id)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">
                     📄 PDF
+                  </button>
+                  <button onClick={() => handleAvviaModifica(r)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                    Modifica
+                  </button>
+                  <button onClick={() => handleElimina(r.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                    Elimina
                   </button>
                 </div>
               </div>

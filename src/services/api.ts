@@ -86,6 +86,7 @@ export const getTariffe = (includiNascoste: boolean = false) => api.get(`/tariff
 export const creaTariffa = (data: any) => api.post('/tariffe/', data);
 export const modificaTariffa = (id: number, data: any) => api.put(`/tariffe/${id}`, data);
 export const eliminaTariffa = (id: number) => api.delete(`/tariffe/${id}`);
+export const eliminaTariffaDefinitivo = (id: number) => api.delete(`/tariffe/${id}/definitivo`);
 export const riattivaTariffa = (id: number) => api.put(`/tariffe/${id}/riattiva`);
 
 // ---- STAFF ----
@@ -163,6 +164,12 @@ export const caricaVerbale = (id: number, file: File) => {
   return api.post(`/assemblee/${id}/verbale`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
 };
 export const eliminaVerbale = (id: number) => api.delete(`/assemblee/${id}/verbale`);
+export const generaVerbaleDocx = async (id: number, nomeFile: string) => {
+  const res = await api.get(`/assemblee/${id}/verbale/genera-docx`, { responseType: 'blob' });
+  const url = URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement('a'); a.href = url; a.download = nomeFile; a.click();
+  URL.revokeObjectURL(url);
+};
 
 export const getPuntiAssemblea = (assembleaId: number) => api.get(`/assemblee/${assembleaId}/punti`);
 export const creaPunto = (data: any) => api.post('/punti/', data);
@@ -328,6 +335,8 @@ export const scaricaRicevutaPdf = async (pagamentoId: number, nomeFile?: string)
 // ---- RICEVUTE EROGAZIONE LIBERALE ----
 export const getRicevuteDonazione = () => api.get('/ricevute/erogazione-liberale/');
 export const creaRicevutaDonazione = (data: any) => api.post('/ricevute/erogazione-liberale/', data);
+export const modificaRicevutaDonazione = (id: number, data: any) => api.put(`/ricevute/erogazione-liberale/${id}`, data);
+export const eliminaRicevutaDonazione = (id: number) => api.delete(`/ricevute/erogazione-liberale/${id}`);
 export const scaricaRicevutaDonazionePdf = async (id: number) => {
   const res = await api.get(`/ricevute/erogazione-liberale/${id}/pdf`, { responseType: 'blob' });
   const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
