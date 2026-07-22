@@ -43,23 +43,12 @@ const MENU: VoceMenu[] = [
     ],
   },
   {
-    id: 'staff',
-    label: 'Staff',
-    icona: '👨‍💼',
-    sezione: 'staff',
-    sottovoci: [
-      { label: 'Elenco staff', path: '/staff' },
-      { label: 'Compensi', path: '/staff' },
-    ],
-  },
-  {
     id: 'attivita',
     label: 'Attività',
     icona: '📅',
     sottovoci: [
       { label: 'Calendario', path: '/calendario', },
       { label: 'Presenze', path: '/presenze' },
-      { label: 'Assemblee', path: '/assemblee' },
     ],
   },
   {
@@ -76,6 +65,17 @@ const MENU: VoceMenu[] = [
     label: 'Iscrizioni online',
     icona: '📝',
     path: '/iscrizioni',
+  },
+  {
+    id: 'societa',
+    label: 'Società',
+    icona: '🏛️',
+    sezione: 'staff',
+    sottovoci: [
+      { label: 'Soci', path: '/staff' },
+      { label: 'Assemblee', path: '/assemblee' },
+      { label: 'Documenti societari', path: '/documenti-societari' },
+    ],
   },
   {
     id: 'impostazioni',
@@ -213,8 +213,8 @@ const Layout: React.FC<LayoutProps> = ({ children, titolo }) => {
           })}
         </nav>
 
-        {/* PUSH NOTIFICATIONS */}
-        {sidebarAperta && (
+        {/* PUSH NOTIFICATIONS — temporaneamente nascosta (logica mantenuta) */}
+        {false && sidebarAperta && (
           <div className="px-4 py-2 border-t border-white/10">
             {!iscritto ? (
               <button

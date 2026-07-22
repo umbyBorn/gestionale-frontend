@@ -3,11 +3,11 @@ import {
   getAssemblee, creaAssemblea, aggiornaAssemblea, eliminaAssemblea,
   getPuntiAssemblea, creaPunto, aggiornaEsitoPunto,
   getPartecipantiAssemblea, registraPartecipazione,
-  getTesserati,
+  getTesserati, caricaVerbale, eliminaVerbale, generaVerbaleDocx,
 } from '../services/api';
 
 interface Assemblea {
-  id: number; titolo: string; data: string; ora?: string; luogo?: string; stato: string; note?: string;
+  id: number; titolo: string; data: string; ora?: string; luogo?: string; stato: string; note?: string; path_verbale?: string;
 }
 interface Punto { id: number; assemblea_id: number; numero: number; titolo: string; descrizione?: string; esito?: string; }
 interface Partecipazione { id: number; assemblea_id: number; tesserato_id: number; presente: boolean; voto?: string; }
@@ -105,6 +105,22 @@ const Assemblee: React.FC = () => {
     if (window.confirm('Eliminare questa assemblea?')) {
       await eliminaAssemblea(id);
       if (assembleaSelezionata?.id === id) setAssembleaSelezionata(null);
+      carica();
+    }
+  };
+
+  const handleCaricaVerbale = async (file: File) => {
+    if (!assembleaSelezionata) return;
+    const res = await caricaVerbale(assembleaSelezionata.id, file);
+    setAssembleaSelezionata(res.data);
+    carica();
+  };
+
+  const handleEliminaVerbale = async () => {
+    if (!assembleaSelezionata) return;
+    if (window.confirm('Rimuovere il verbale caricato?')) {
+      const res = await eliminaVerbale(assembleaSelezionata.id);
+      setAssembleaSelezionata(res.data);
       carica();
     }
   };
@@ -244,6 +260,29 @@ const Assemblee: React.FC = () => {
                       <button onClick={() => apriModifica(assembleaSelezionata)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">Modifica</button>
                       <button onClick={() => handleElimina(assembleaSelezionata.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">Elimina</button>
                     </div>
+                  </div>
+                  <div className="px-4 py-3 border-b flex items-center justify-between gap-3 bg-white flex-wrap">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📄 Verbale</span>
+                    <button
+                      onClick={() => generaVerbaleDocx(assembleaSelezionata.id, `verbale_bozza_${assembleaSelezionata.titolo}.docx`)}
+                      className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                    >
+                      📝 Genera bozza verbale (Word)
+                    </button>
+                    {assembleaSelezionata.path_verbale ? (
+                      <div className="flex items-center gap-3">
+                        <a href={assembleaSelezionata.path_verbale} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+                          Visualizza / Scarica verbale firmato
+                        </a>
+                        <button onClick={handleEliminaVerbale} className="text-red-500 hover:text-red-700 text-xs font-medium">Rimuovi</button>
+                      </div>
+                    ) : (
+                      <label className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer">
+                        + Carica verbale firmato
+                        <input type="file" accept="application/pdf,.doc,.docx" className="hidden"
+                          onChange={e => e.target.files?.[0] && handleCaricaVerbale(e.target.files[0])} />
+                      </label>
+                    )}
                   </div>
                   <div className="flex gap-1 px-3 pt-2 border-b">
                     {(['odg', 'partecipanti'] as const).map(t => (
